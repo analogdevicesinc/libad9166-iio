@@ -1,9 +1,5 @@
-import pytest
-
 import iio
 import ad9166
-import os
-import pathlib
 
 ctx = iio.Context("local:")
 dev = ctx.find_device("ad9166")
