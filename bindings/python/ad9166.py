@@ -143,6 +143,6 @@ def device_set_iofs(dev: iio.Device, data: CalibrationParameters, frequency: int
 
     ret = _ad9166_device_set_iofs(dev._device, data, c_ulonglong(int(frequency)))
     if ret != 0:
-        raise Exception("Setting IOFS failed. ERROR: {ret}")
+        raise Exception(f"Setting IOFS failed. ERROR: {ret}")
 
     return ret
