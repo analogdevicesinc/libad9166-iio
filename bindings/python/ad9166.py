@@ -88,19 +88,25 @@ _ad9166_device_set_iofs.restype = c_int
 _ad9166_device_set_iofs.argtypes = (_DevicePtr, _POINTER(CalibrationParameters), c_ulonglong)
 _ad9166_device_set_iofs.errcheck = _check_negative
 
-def find_calibration_data(ctx: iio.Context, name: str, data: CalibrationParameters):
+
+def find_calibration_data(ctx: iio.Context, name: str):
     """Calibration configuration.
     :param: iio.Context dev: IIO Context of AD9166 driver
     :param str name: Desired name of the device
-    :param CalibrationParameters data: Calibration parameters
+    :return: CalibrationParameters: Calibration parameters
     """
 
-    ret = _ad9166_context_find_calibration_data(ctx._context, c_char_p(str(name).encode('utf-8')), byref(data))
+    data = _POINTER(CalibrationParameters)()
+
+    ret = _ad9166_context_find_calibration_data(
+        ctx._context, c_char_p(str(name).encode("utf-8")), byref(data)
+    )
 
     if ret != 0:
         raise Exception(f"Loading Calibration data failed. ERROR: {ret}")
 
-    return ret
+    return data
+
 
 def set_amplitude(dev: iio.Device, amplitude: int):
     """Amplitude configuration.
@@ -115,7 +121,6 @@ def set_amplitude(dev: iio.Device, amplitude: int):
     if ret != 0:
         raise Exception(f"Setting amplitude failed. ERROR: {ret}")
 
-    return ret
 
 def set_frequency(ch: iio.Channel, frequency: int):
     """Frequency configuration.
@@ -130,7 +135,6 @@ def set_frequency(ch: iio.Channel, frequency: int):
     if ret != 0:
         raise Exception(f"Setting frequency failed. ERROR: {ret}")
 
-    return ret
 
 def device_set_iofs(dev: iio.Device, data: CalibrationParameters, frequency: int):
     """IOFS configuration.
@@ -144,5 +148,3 @@ def device_set_iofs(dev: iio.Device, data: CalibrationParameters, frequency: int
     ret = _ad9166_device_set_iofs(dev._device, data, c_ulonglong(int(frequency)))
     if ret != 0:
         raise Exception(f"Setting IOFS failed. ERROR: {ret}")
-
-    return ret

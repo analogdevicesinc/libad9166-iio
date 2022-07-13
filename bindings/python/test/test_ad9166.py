@@ -13,9 +13,7 @@ def test_set_calibrated_amplitude_frequency(iio_uri):
     ad9166.set_amplitude(dev, -10)
     ad9166.set_frequency(ch, 3000000000)
 
-    data = ad9166._POINTER(ad9166.CalibrationParameters)()
-
-    ad9166.find_calibration_data(ctx, "cn0511", data)
+    data = ad9166.find_calibration_data(ctx, "cn0511")
 
     print(data.contents.Freqs.contents)
 
