@@ -3,6 +3,7 @@ import pytest
 import iio
 import ad9166
 
+
 @pytest.mark.iio_hardware(["ad9166"])
 def test_set_calibrated_amplitude_frequency(iio_uri):
     ctx = iio.Context(iio_uri)

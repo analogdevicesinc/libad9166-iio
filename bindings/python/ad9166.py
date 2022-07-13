@@ -60,17 +60,23 @@ else:
 
 _lib = _cdll(find_library(_libad9166), use_errno=True, use_last_error=True)
 
+
 class CalibrationParameters(Structure):
-     _fields_ = [
+    _fields_ = [
         ("Freqs", _POINTER(c_double)),
         ("Offsets", _POINTER(c_double)),
         ("Gains", _POINTER(c_double)),
         ("Len", c_size_t),
     ]
 
+
 _ad9166_context_find_calibration_data = _lib.ad9166_context_find_calibration_data
 _ad9166_context_find_calibration_data.restype = c_int
-_ad9166_context_find_calibration_data.argtypes = (_ContextPtr, _POINTER(c_char), _POINTER(_POINTER(CalibrationParameters)))
+_ad9166_context_find_calibration_data.argtypes = (
+    _ContextPtr,
+    _POINTER(c_char),
+    _POINTER(_POINTER(CalibrationParameters)),
+)
 _ad9166_context_find_calibration_data.errcheck = _check_negative
 
 _ad9166_device_set_amplitude = _lib.ad9166_device_set_amplitude
@@ -85,7 +91,11 @@ _ad9166_channel_set_frequency.errcheck = _check_negative
 
 _ad9166_device_set_iofs = _lib.ad9166_device_set_iofs
 _ad9166_device_set_iofs.restype = c_int
-_ad9166_device_set_iofs.argtypes = (_DevicePtr, _POINTER(CalibrationParameters), c_ulonglong)
+_ad9166_device_set_iofs.argtypes = (
+    _DevicePtr,
+    _POINTER(CalibrationParameters),
+    c_ulonglong,
+)
 _ad9166_device_set_iofs.errcheck = _check_negative
 
 
@@ -146,5 +156,6 @@ def device_set_iofs(dev: iio.Device, data: CalibrationParameters, frequency: int
         raise Exception("frequency must be an integer")
 
     ret = _ad9166_device_set_iofs(dev._device, data, c_ulonglong(int(frequency)))
+
     if ret != 0:
         raise Exception(f"Setting IOFS failed. ERROR: {ret}")
