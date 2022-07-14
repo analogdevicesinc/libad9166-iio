@@ -8,29 +8,27 @@ handle_default() {
 	mkdir -p build
 	cd build
 	cmake -DPYTHON_BINDINGS=ON -DENABLE_PACKAGING=ON -DDEB_DETECT_DEPENDENCIES=ON ..
-	# sudo make && make package && make test
-	sudo make && make package
+	sudo make && make package && make test
 	sudo make install
 	sudo ldconfig
 	cd ..
 	cd bindings/python
 	pip3 install -r requirements_dev.txt
-	# python3 -m pytest -vs --skip-scan
+	python3 -m pytest -vs --skip-scan
 }
 
 handle_centos() {
 	mkdir -p build
 	cd build
 	cmake -DPYTHON_BINDINGS=ON -DENABLE_PACKAGING=ON ..
-	# sudo make && make package && make test
-	sudo make && make package
+	sudo make && make package && make test
 	sudo make install
 	sudo ldconfig
 	cd ..
 	cd bindings/python
 	pip3 install -r requirements_dev.txt
 	export LD_LIBRARY_PATH=/usr/local/lib/
-	# python3 -m pytest -vs --skip-scan
+	python3 -m pytest -vs --skip-scan
 }
 
 handle_ubuntu() {
