@@ -125,6 +125,9 @@ int ad9166_device_set_iofs(struct iio_device *dev,
 {
 	int ret;
 
+	if (!data)
+		return -EINVAL;
+	
 	if (data->len < 1)
 		return -EINVAL;
 
