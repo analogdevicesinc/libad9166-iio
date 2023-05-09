@@ -17,6 +17,7 @@ from iio import _ContextPtr, _DevicePtr, _ChannelPtr
 # pylint: disable=protected-access
 from ctypes import (
     byref,
+    c_bool,
     c_ubyte,
     c_double,
     c_int,
@@ -67,6 +68,7 @@ class CalibrationParameters(Structure):
         ("Offsets", _POINTER(c_double)),
         ("Gains", _POINTER(c_double)),
         ("Len", c_size_t),
+        ("Calibrated", c_bool),
     ]
 
 
@@ -98,6 +100,9 @@ _ad9166_device_set_iofs.argtypes = (
 )
 _ad9166_device_set_iofs.errcheck = _check_negative
 
+_ad9166_device_get_calibrated = _lib.ad9166_device_is_calibrated
+_ad9166_device_get_calibrated.restype = c_bool
+_ad9166_device_get_calibrated.argtypes =(_POINTER(CalibrationParameters),)
 
 def find_calibration_data(ctx: iio.Context, name: str):
     """Calibration configuration.
@@ -159,3 +164,12 @@ def device_set_iofs(dev: iio.Device, data: CalibrationParameters, frequency: int
 
     if ret != 0:
         raise Exception(f"Setting IOFS failed. ERROR: {ret}")
+
+def device_is_calibrated(data: CalibrationParameters):
+    """Calibrated constants.
+    :param CalibrationParameters data: Calibration parameters
+    """
+
+    iscalibrated = _ad9166_device_get_calibrated(data)
+
+    return iscalibrated
