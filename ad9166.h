@@ -7,6 +7,7 @@
 #define __AD9166_H__
 
 #include <stddef.h>
+#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -41,6 +42,7 @@ struct ad9166_calibration_data {
 	double *offsets;
 	double *gains;
 	size_t len;
+	bool calibrated;
 };
 
 /* ---------------------------------------------------------------------------*/
@@ -61,6 +63,8 @@ __api int ad9166_device_set_amplitude(struct iio_device *dev,
 __api int ad9166_device_set_iofs(struct iio_device *dev,
 				 struct ad9166_calibration_data *data,
 				 unsigned long long int freq);
+
+__api bool ad9166_device_is_calibrated(struct ad9166_calibration_data *data);
 
 /** @} */
 
