@@ -13,10 +13,14 @@ int main(int argc, char *argv[])
 	int ret;
 	const char *uri;
 
-	if (argc < 2)
-		uri = "local:";
-	else
+	if (argc < 2){
+		// try retrieving URI from environment variables first
+		uri = getenv("URI_AD9166");
+		if (uri == NULL)
+			uri = "local:";
+	}else{
 		uri = argv[1];
+	}
 
 	struct iio_context *ctx = iio_create_context_from_uri(uri);
 	if (!ctx) {
