@@ -257,8 +257,42 @@ jobs:
       sourceFolder: '$(Agent.BuildDirectory)/s/'
       contents: 'ad9166.h'
       targetFolder: '$(Build.ArtifactStagingDirectory)'
+  - task: CopyFiles@2
+    displayName: 'Copy .exe files'
+    inputs:
+      sourceFolder: '$(Agent.BuildDirectory)/s/build'
+      contents: '*.exe'
+      targetFolder: '$(Build.ArtifactStagingDirectory)'
+  - task: CopyFiles@2
+    displayName: 'Copy libiio.dll'
+    inputs:
+      sourceFolder: '$(Agent.BuildDirectory)/s/build'
+      contents: 'libiio.dll'
+      targetFolder: '$(Build.ArtifactStagingDirectory)'
+  - task: PowerShell@2
+    displayName: 'Copy dependencies'
+    inputs:
+      targetType: 'filePath'
+      filePath: .\CI\publish_deps.ps1
   - task: PublishPipelineArtifact@1
     condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
       artifactName: '$(artifactName)'
+- job: GenerateSetupExe
+  dependsOn: WindowsBuilds
+  pool:
+    vmImage: 'windows-2019'
+  steps:
+  - task: DownloadPipelineArtifact@2
+    inputs:
+      path: '$(Build.ArtifactStagingDirectory)'
+  - task: PowerShell@2
+    inputs:
+      targetType: 'filePath'
+      filePath: .\CI\generate_exe.ps1
+    displayName: 'Generate libad9166-setup.exe'
+  - task: PublishPipelineArtifact@1
+    inputs:
+      targetPath: '$(Build.ArtifactStagingDirectory)'
+      artifactName: 'Libad9166-Setup-Exe'

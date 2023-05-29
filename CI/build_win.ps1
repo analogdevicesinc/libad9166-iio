@@ -7,6 +7,9 @@ $src_dir=$pwd
 if (!(Test-Path build)) {
 	mkdir build
 }
+
+cp .\libad9166-iio.iss.cmakein .\build
+
 cd build
 
 cmake -G "$COMPILER" -A "$ARCH" `
@@ -16,3 +19,5 @@ cmake -G "$COMPILER" -A "$ARCH" `
 	..
 
 cmake --build . --config Release
+
+cp .\libad9166-iio.iss $env:BUILD_ARTIFACTSTAGINGDIRECTORY
