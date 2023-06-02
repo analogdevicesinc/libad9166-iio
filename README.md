@@ -30,34 +30,20 @@ As with many open source packages, we use [GitHub](https://github.com/analogdevi
 If you use it, and like it - please let us know. If you use it, and hate it - please let us know that too. The goal of the project is to try to make Linux IIO devices easier to use on a variety of platforms. If we aren't doing that - we will try to make it better.
 
 
-## Building & Installing
-
-should be a quick matter of `cmake`, then `make`, then `make install`:
+## Building & Installing libad9166 on LINUX
 
 ```
-rgetz@pinky:~/libad9166-iio$ cmake ./CMakeLists.txt
--- The C compiler identification is GNU 4.7.2
--- Check for working C compiler: /usr/bin/gcc
--- Check for working C compiler: /usr/bin/gcc -- works
--- Detecting C compiler ABI info
--- Detecting C compiler ABI info - done
--- Configuring done
--- Generating done
--- Build files have been written to: /home/rgetz/libad9166-iio
-rgetz@pinky:~/libad9166-iio$ make
-Scanning dependencies of target ad9166
-[100%] Building C object CMakeFiles/ad9166.dir/ad9166_multichip_sync.c.o
-Linking C shared library libad9166.so
-Copying OS X content Headers/ad9166.h
-[100%] Built target ad9166
-rgetz@pinky:~/libad9166-iio$ sudo make install
-[sudo] password for rgetz: 
-[100%] Built target ad9166
-Install the project...
--- Install configuration: ""
--- Installing: /usr/local/lib/pkgconfig/libad9166.pc
--- Installing: /usr/local/lib/libad9166.so.0.1
--- Installing: /usr/local/lib/libad9166.so.0
--- Installing: /usr/local/lib/libad9166.so
--- Installing: /usr/local/include/ad9166.h
+cd libad9166-iio/
+sudo cmake ./CMakeLists.txt
+sudo make
+sudo make install
+```
+
+## Building & Installing python bindings on LINUX
+```
+cd bindings/python
+sudo pip install -r requirements_dev.txt
+cmake ./CMakeLists.txt
+sudo make
+sudo make install
 ```
