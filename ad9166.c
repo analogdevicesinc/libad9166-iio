@@ -176,15 +176,16 @@ int ad9166_device_set_iofs(struct iio_device *dev,
 
 	unsigned int iofs;
 
-	if (freq < 1000000000)
+	if (freq < data->freqs[0]) {
 		iofs = data->offsets[0];
-
-	for (unsigned int i = 0; i < data->len; i++) {
-		if (i == data->len - 1
-		    || freq >= data->freqs[i] && freq < data->freqs[i + 1]) {
-			iofs = data->offsets[i] +  data->gains[i]
-			       * (freq - data->freqs[i]);
-			break;
+	} else {
+		for (unsigned int i = 0; i < data->len; i++) {
+			if (i == data->len - 1
+			    || freq >= data->freqs[i] && freq < data->freqs[i + 1]) {
+				iofs = data->offsets[i] +  data->gains[i]
+				       * (freq - data->freqs[i]);
+				break;
+			}
 		}
 	}
 
