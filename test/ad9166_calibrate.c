@@ -41,19 +41,20 @@ int main(int argc, char *argv[])
 		return ret;
 
 	printf("Freqs: ");
-	for (unsigned int i = 0; i < data->len; i++) {
+	unsigned int i;
+	for (i = 0; i < data->len; i++) {
 		printf("%g\n", data->freqs[i]);
 	}
 	printf("\n");
 
 	printf("Offsets: ");
-	for (unsigned int i = 0; i < data->len; i++) {
+	for (i = 0; i < data->len; i++) {
 		printf("%g\n", data->offsets[i]);
 	}
 	printf("\n");
 
 	printf("Gains: ");
-	for (unsigned int i = 0; i < data->len; i++) {
+	for (i = 0; i < data->len; i++) {
 		printf("%g\n", data->gains[i]);
 	}
 	printf("\n");
