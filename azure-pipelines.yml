@@ -57,7 +57,6 @@ jobs:
       contents: '$(Agent.BuildDirectory)/s/build/?(*.deb|*.rpm)'
       targetFolder: '$(Build.ArtifactStagingDirectory)'
   - task: PublishPipelineArtifact@1
-    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
       artifactName: '$(artifactName)'
@@ -162,7 +161,6 @@ jobs:
       contents: '$(Agent.BuildDirectory)/s/build/?(*.deb|*.rpm)'
       targetFolder: '$(Build.ArtifactStagingDirectory)'
   - task: PublishPipelineArtifact@1
-    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
       artifactName: '$(artifactName)'
@@ -203,7 +201,6 @@ jobs:
       contents: '$(Agent.BuildDirectory)/s/build/?(*.pkg)'
       targetFolder: '$(Build.ArtifactStagingDirectory)'
   - task: PublishPipelineArtifact@1
-    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
       artifactName: '$(artifactName)'
@@ -275,7 +272,6 @@ jobs:
       targetType: 'filePath'
       filePath: .\CI\publish_deps.ps1
   - task: PublishPipelineArtifact@1
-    condition: and(succeeded(), ne(variables['Build.Reason'], 'PullRequest'))
     inputs:
       targetPath: '$(Build.ArtifactStagingDirectory)'
       artifactName: '$(artifactName)'
