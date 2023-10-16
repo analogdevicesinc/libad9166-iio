@@ -6,6 +6,8 @@ trigger:
     include:
     - main
     - master
+    - next_stable
+    - libad9166-iio-v0
     - staging/*
     - 20*
 
@@ -14,6 +16,8 @@ pr:
     include:
     - main
     - master
+    - next_stable
+    - libad9166-iio-v0
     - 20*
 
 jobs:
