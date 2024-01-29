@@ -59,6 +59,12 @@ jobs:
         build_script: ci-linux.sh
         OS_TYPE: default
         PACKAGE_TO_INSTALL: '/ci/build/*.deb'
+      debian_bookworm:
+        image: 'tfcollins/libiio_debian_bookworm-ci:latest'
+        artifactName: 'Linux-Debian-12'
+        build_script: ci-linux.sh
+        OS_TYPE: default
+        PACKAGE_TO_INSTALL: '/ci/build/*.deb'
       centos_7:
         image: 'tfcollins/libiio_centos_7-ci:latest'
         artifactName: 'Linux-CentOS-7'
