@@ -11,7 +11,7 @@ variables:
   ${{ elseif eq(variables['Build.Reason'], 'PullRequest') }}:
     downloadBranch: $[ format('refs/heads/{0}',replace(variables['System.PullRequest.TargetBranch'], 'libad9166-iio-v0', 'libiio-v0')) ]
   ${{ else }}:
-    downloadBranch: 'refs/heads/main'
+    downloadBranch: 'refs/heads/libiio-v0'
 
 trigger:
   branches:
