@@ -111,7 +111,7 @@ jobs:
       path: '$(Agent.BuildDirectory)/s/build/'
   - script: |
       set -e
-      sudo docker run --rm -t --privileged aandrisa/kuiper2:latest /bin/bash -c "ls /home/"
+      docker run --rm -t --privileged aandrisa/kuiper2:latest /bin/bash -c "ls /home/"
     displayName: "Build"
   - task: CopyFiles@2
     inputs:
