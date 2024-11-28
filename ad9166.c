@@ -4,7 +4,7 @@
 #include "utilities.h"
 
 #include <errno.h>
-#include <iio.h>
+#include <iio/iio.h>
 #include <math.h>
 #include <stdio.h>
 #include <stddef.h>
@@ -17,6 +17,7 @@
 #endif
 
 #define MAX_ATTR_NAME		128
+#define MAX_ATTR_VALUE   	128
 #define MAX_CALIB_LENGTH	32
 #define ARRAY_DELIM " [,]"
 
@@ -88,18 +89,37 @@ int ad9166_context_find_calibration_data(struct iio_context *ctx,
 		const char *name,
 		struct ad9166_calibration_data **data)
 {
+	const struct iio_attr *attr;
 	char freq_attr_name[MAX_ATTR_NAME];
 	char offset_attr_name[MAX_ATTR_NAME];
 	char gain_attr_name[MAX_ATTR_NAME];
+	char freq_attr_value[MAX_ATTR_VALUE];
+	char offset_attr_value[MAX_ATTR_VALUE];
+	char gain_attr_value[MAX_ATTR_VALUE];
+	const char *freq_attr = NULL;
+	const char *offset_attr = NULL;
+	const char *gain_attr = NULL;
 	int ret;
 
 	snprintf(freq_attr_name, sizeof(freq_attr_name), "%s%s", name, "_freq");
 	snprintf(offset_attr_name, sizeof(offset_attr_name), "%s%s", name, "_offset");
 	snprintf(gain_attr_name, sizeof(gain_attr_name), "%s%s", name, "_gain");
 
-	const char *freq_attr = iio_context_get_attr_value(ctx, freq_attr_name);
-	const char *offset_attr = iio_context_get_attr_value(ctx, offset_attr_name);
-	const char *gain_attr = iio_context_get_attr_value(ctx, gain_attr_name);
+	attr = iio_context_find_attr(ctx, freq_attr_name);
+	if (attr) {
+		iio_attr_read_raw(attr, freq_attr_value, sizeof(freq_attr_value));
+		freq_attr = freq_attr_value;
+	}
+	attr = iio_context_find_attr(ctx, offset_attr_name);
+	if (attr) {
+		iio_attr_read_raw(attr, offset_attr_value, sizeof(offset_attr_value));
+		offset_attr = offset_attr_value;
+	}
+	attr = iio_context_find_attr(ctx, gain_attr_name);
+	if (attr) {
+		iio_attr_read_raw(attr, gain_attr_value, sizeof(gain_attr_value));
+		gain_attr = offset_attr_value;
+	}
 
 	size_t freqs_len, offsets_len, gains_len;
 	double *freqs, *offsets, *gains;
@@ -137,9 +157,14 @@ int ad9166_context_find_calibration_data(struct iio_context *ctx,
 int ad9166_channel_set_freq(struct iio_channel *ch,
 			    unsigned long long int freq)
 {
+	const struct iio_attr *attr;
 	int ret;
 
-	ret = iio_channel_attr_write_longlong(ch, "nco_frequency", freq);
+	attr = iio_channel_find_attr(ch, "nco_frequency");
+	if (attr)
+		ret = iio_attr_write_longlong(attr, freq);
+	else
+		ret = -ENOENT;
 	if (ret < 0)
 		return ret;
 
