@@ -1,10 +1,7 @@
 #include <stdio.h>
+#include <errno.h>
 
-#ifdef __APPLE__
 #include <iio/iio.h>
-#else
-#include <iio.h>
-#endif
 
 #include "ad9166.h"
 
@@ -22,7 +19,7 @@ int main(int argc, char *argv[])
 		uri = argv[1];
 	}
 
-	struct iio_context *ctx = iio_create_context_from_uri(uri);
+	struct iio_context *ctx = iio_create_context(NULL, uri);
 	if (!ctx) {
 		fprintf(stderr, "Cannot find iio context\n");
 		return 0;
@@ -35,6 +32,7 @@ int main(int argc, char *argv[])
 	}
 
 	struct ad9166_calibration_data *data;
+	const struct iio_attr *attr;
 
 	ret = ad9166_context_find_calibration_data(ctx, "cn0511", &data);
 	if (ret)
@@ -59,11 +57,19 @@ int main(int argc, char *argv[])
 	}
 	printf("\n");
 
-	ret = iio_device_attr_write(dev, "sampling_frequency", "6000000000");
+	attr = iio_device_find_attr(dev, "sampling_frequency");
+	if (attr)
+		ret = iio_attr_write(attr, "6000000000");
+	else
+		ret = -ENOENT;
 	if (ret < 0)
 		return ret;
 
-	ret = iio_device_attr_write(dev, "fir85_enable", "1");
+	attr = iio_device_find_attr(dev, "fir85_enable");
+	if (attr)
+		ret = iio_attr_write(attr, "1");
+	else
+		ret = -ENOENT;
 	if (ret < 0)
 		return ret;
 

@@ -75,7 +75,7 @@ set(INSTALL_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib"
 mark_as_advanced(INSTALL_LIB_DIR)
 
 find_library(LIBIIO_LIBRARIES iio)
-find_path(LIBIIO_INCLUDEDIR iio.h)
+find_path(LIBIIO_INCLUDEDIR iio/iio.h)
 
 set(LIBAD9166_HEADERS ad9166.h)
 
