@@ -22,6 +22,16 @@ trigger:
     - staging/*
     - 20*
 
+resources:
+  pipelines:
+  - pipeline: triggered_by_libiio
+    source: analogdevicesinc.libiio
+    project: OpenSource
+    trigger:
+      branches:
+       include:
+       - main
+
 pr:
   branches:
     include:
