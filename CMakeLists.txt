@@ -90,15 +90,22 @@ add_library(ad9166 ad9166.c
             ${LIBAD9166_HEADERS})
 enable_testing()
 add_subdirectory(test)
+
+# Use C99 on older Windows SDK versions
+if (WIN32 AND CMAKE_SYSTEM_VERSION VERSION_LESS "10.0.18362")
+    set_target_properties(ad9166 PROPERTIES C_STANDARD 99)
+else()
+    set_target_properties(ad9166 PROPERTIES C_STANDARD 11)
+endif()
 set_target_properties(ad9166 PROPERTIES
 	VERSION ${VERSION}
 	SOVERSION ${LIBAD9166_VERSION_MAJOR}
 	FRAMEWORK TRUE
 	PUBLIC_HEADER ${LIBAD9166_HEADERS}
-	C_STANDARD 11
 	C_STANDARD_REQUIRED ON
 	C_EXTENSIONS OFF
 )
+
 target_link_libraries(ad9166 LINK_PRIVATE ${LIBIIO_LIBRARIES})
 
 if (MSVC)
