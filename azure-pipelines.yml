@@ -118,15 +118,18 @@ stages:
         contents: '$(Agent.BuildDirectory)/s/build/?(*.deb|*.rpm)'
         targetFolder: '$(Build.ArtifactStagingDirectory)'
     - task: PublishPipelineArtifact@1
+      condition: succeeded()
       inputs:
         targetPath: '$(Build.ArtifactStagingDirectory)'
         artifactName: '$(artifactName)'
     - script: |
         sudo pip install setuptools wheel twine build
-        cd /home/vsts/work/1/s/build/bindings/python
-        sudo python setup.py bdist_wheel
+        DEB_HOST_GNU_TYPE=obj-$(dpkg-architecture -qDEB_HOST_GNU_TYPE)
+        cd /home/vsts/work/1/s/$DEB_HOST_GNU_TYPE/bindings/python
+        cp ../../README.md .
+        sudo python -m build
       condition: eq(variables['artifactName'], 'Linux-Ubuntu-20.04')
-      displayName: "Install wheel and twine"
+      displayName: "Build python wheel"
     - task: TwineAuthenticate@1
       condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), eq(variables['artifactName'], 'Linux-Ubuntu-20.04'))
       displayName: Twine Authenticate
@@ -140,16 +143,17 @@ stages:
         artifactFeed: test-libad9361-iio
         pythonUploadServiceConnection: PyPi_Test
     - script: |
-        cd /home/vsts/work/1/s/build/bindings/python
+        cd /home/vsts/work/1/s/$DEB_HOST_GNU_TYPE/bindings/python
         python -m twine upload -u $(USERNAME) -p $(PASSWORD) --config-file $(PYPIRC_PATH) dist/*.whl
       condition: and(succeeded(), startsWith(variables['Build.SourceBranch'], 'refs/tags/v'), eq(variables['artifactName'], 'Linux-Ubuntu-20.04'))
       displayName: "Deploy python package"
     - script: |
-        cd /home/vsts/work/1/s/build/bindings/python
+        cd /home/vsts/work/1/s/$DEB_HOST_GNU_TYPE/bindings/python
         sudo rm ./dist/*.whl
         sudo pip3 install --upgrade requests
         sudo pip install invoke
         sudo invoke bumpversion-test
+        cp ../../README.md .
         sudo python -m build
         ls -al
         cd dist
@@ -157,7 +161,7 @@ stages:
       condition: and(succeeded(), eq(variables.isMain, true), eq(variables['artifactName'], 'Linux-Ubuntu-20.04'))
       displayName: "Update to dev version"
     - script: |
-        cd /home/vsts/work/1/s/build/bindings/python
+        cd /home/vsts/work/1/s/$DEB_HOST_GNU_TYPE/bindings/python
         sudo python -m twine upload --repository-url https://test.pypi.org/legacy/ -u $(USERNAME) -p $(PASSWORD) --skip-existing --config-file $(PYPIRC_PATH) dist/*.whl
       condition: and(succeeded(), eq(variables.isMain, true), eq(variables['artifactName'], 'Linux-Ubuntu-20.04'))
       displayName: "Deploy python test package"
@@ -204,11 +208,8 @@ stages:
     - script: |
         set -e
         sudo apt-get update
-        sudo apt-get install -y gcc-arm-linux-gnueabihf libc6-dev-armhf-cross
-        sudo apt-get install -y g++-arm-linux-gnueabihf
-        sudo apt-get install -y g++-aarch64-linux-gnu
-        sudo apt-get install -y qemu-system-ppc64
-        sudo apt-get install qemu binfmt-support qemu-user-static
+        sudo apt-get install qemu-user-static
+        sudo sysctl kernel.randomize_va_space=0
         sudo docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
       displayName: "Setup"
     - script: |
@@ -221,6 +222,7 @@ stages:
         contents: '$(Agent.BuildDirectory)/s/build/?(*.deb|*.rpm)'
         targetFolder: '$(Build.ArtifactStagingDirectory)'
     - task: PublishPipelineArtifact@1
+      condition: succeeded()
       inputs:
         targetPath: '$(Build.ArtifactStagingDirectory)'
         artifactName: '$(artifactName)'
@@ -230,16 +232,6 @@ stages:
       clean: all
     strategy:
       matrix:
-        macOS_12:
-          poolName: 'Azure Pipelines'
-          vmImage: 'macOS-12'
-          agentName: 'Azure Pipelines 3'
-          artifactName: 'macOS-12'
-        macOS_13_x64:
-          poolName: 'Azure Pipelines'
-          vmImage: 'macOS-13'
-          agentName: 'Azure Pipelines 2'
-          artifactName: 'macOS-13-x64'
         macOS_13_arm64:
           poolName: 'Default'
           vmImage:
@@ -275,6 +267,7 @@ stages:
         contents: '$(Agent.BuildDirectory)/s/build/?(*.pkg)'
         targetFolder: '$(Build.ArtifactStagingDirectory)'
     - task: PublishPipelineArtifact@1
+      condition: succeeded()
       inputs:
         targetPath: '$(Build.ArtifactStagingDirectory)'
         artifactName: '$(artifactName)'
@@ -287,11 +280,6 @@ stages:
             COMPILER: 'Visual Studio 17 2022'
             ARCH: 'x64'
             artifactName: 'Windows-VS-2022-x64'
-        VS2019_Win64:
-          imageName: 'windows-2019'
-          COMPILER: 'Visual Studio 16 2019'
-          ARCH: 'x64'
-          artifactName: 'Windows-VS-2019-x64'
     pool:
       vmImage: $[ variables['imageName'] ]
     steps:
@@ -366,6 +354,7 @@ stages:
         filePath: .\CI\generate_exe.ps1
       displayName: 'Generate libad9166-setup.exe'
     - task: PublishPipelineArtifact@1
+      condition: succeeded()
       inputs:
         targetPath: '$(Build.ArtifactStagingDirectory)'
         artifactName: 'Libad9166-Setup-Exe'
