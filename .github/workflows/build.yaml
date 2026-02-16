@@ -4,7 +4,7 @@ permissions:
   contents: read
 
 env:
-  APP_NAME: libad9166-iio
+  APP_NAME: libad9166
 
 on:
   workflow_dispatch:
@@ -13,13 +13,14 @@ on:
       - main
       - '20[1-9][0-9]_R[1-9]'
       - staging/*
+      - libad9166-iio-v0
     tags:
       - 'v*'
   pull_request:
     branches:
       - main
       - '20[1-9][0-9]_R[1-9]'
-
+      - libad9166-iio-v0
 jobs:
   identify_version:
     runs-on: ubuntu-latest
