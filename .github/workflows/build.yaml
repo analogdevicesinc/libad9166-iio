@@ -4,7 +4,7 @@ permissions:
   contents: read
 
 env:
-  APP_NAME: libad9166-iio
+  APP_NAME: libad9166
 
 on:
   workflow_dispatch:
