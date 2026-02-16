@@ -8,10 +8,10 @@ source_code=$(basename "$PWD")
 # Use sudo only if not running as root
 if [ "$(id -u)" -eq 0 ]; then
     apt-get update
-    apt-get install -y build-essential cmake libiio-dev python3 python3-setuptools dh-python devscripts debhelper
+    apt-get install -y build-essential cmake libiio-dev python3 python3-pip python3-setuptools dh-python devscripts debhelper
 else
     sudo apt-get update
-    sudo apt-get install -y build-essential cmake libiio-dev python3 python3-setuptools dh-python devscripts debhelper
+    sudo apt-get install -y build-essential cmake libiio-dev python3 python3-pip python3-setuptools dh-python devscripts debhelper
 fi
 
 # Replace placeholders inside the debian template files

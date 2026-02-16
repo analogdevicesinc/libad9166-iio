@@ -80,12 +80,7 @@ execute_process(COMMAND dpkg-architecture -qDEB_HOST_MULTIARCH
 	OUTPUT_STRIP_TRAILING_WHITESPACE
 	ERROR_QUIET)
 
-# Find libiio library with multiarch path hint
-find_library(LIBIIO_LIBRARIES iio
-	HINTS
-		/usr/lib/${DEB_HOST_MULTIARCH}
-		/lib/${DEB_HOST_MULTIARCH}
-)
+find_library(LIBIIO_LIBRARIES iio)
 find_path(LIBIIO_INCLUDEDIR iio.h)
 
 set(LIBAD9166_HEADERS ad9166.h)
