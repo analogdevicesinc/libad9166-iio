@@ -10,12 +10,12 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 # Lesser General Public License for more details.
 
-cmake_minimum_required(VERSION 2.8.7)
-project(ad9166 C)
+cmake_minimum_required(VERSION 3.5)
+project(ad9166 LANGUAGES C VERSION 0.2)
 
-set(LIBAD9166_VERSION_MAJOR 0)
-set(LIBAD9166_VERSION_MINOR 2)
-set(VERSION ${LIBAD9166_VERSION_MAJOR}.${LIBAD9166_VERSION_MINOR})
+set(LIBAD9166_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
+set(LIBAD9166_VERSION_MINOR ${PROJECT_VERSION_MINOR})
+set(VERSION ${PROJECT_VERSION})
 
 if (WIN32)
 	string(TIMESTAMP BUILD_YEAR "%Y")
@@ -74,7 +74,18 @@ set(INSTALL_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib"
 	CACHE PATH "Installation directory for libraries")
 mark_as_advanced(INSTALL_LIB_DIR)
 
-find_library(LIBIIO_LIBRARIES iio)
+# Get multiarch library path for Debian/Ubuntu systems
+execute_process(COMMAND dpkg-architecture -qDEB_HOST_MULTIARCH
+	OUTPUT_VARIABLE DEB_HOST_MULTIARCH
+	OUTPUT_STRIP_TRAILING_WHITESPACE
+	ERROR_QUIET)
+
+# Find libiio library with multiarch path hint
+find_library(LIBIIO_LIBRARIES iio
+	HINTS
+		/usr/lib/${DEB_HOST_MULTIARCH}
+		/lib/${DEB_HOST_MULTIARCH}
+)
 find_path(LIBIIO_INCLUDEDIR iio.h)
 
 set(LIBAD9166_HEADERS ad9166.h)
