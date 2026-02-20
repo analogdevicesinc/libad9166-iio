@@ -14,8 +14,6 @@ on:
       - '20[1-9][0-9]_R[1-9]'
       - staging/*
       - libad9166-iio-v0
-    tags:
-      - 'v*'
   pull_request:
     branches:
       - main
