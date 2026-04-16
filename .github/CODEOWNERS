@@ -16,6 +16,6 @@
 *    cristina.suteu@analog.com dan.nechita@analog.com michael.hennerich@analog.com
 
 ##### Code owners for CI related files/folders #####
-/CI/	cristina.suteu@analog.com dan.nechita@analog.com michael.hennerich@analog.com stefan.raus@analog.com andreea.andrisan@analog.com
-azure-pipelines.yml	cristina.suteu@analog.com dan.nechita@analog.com michael.hennerich@analog.com stefan.raus@analog.com andreea.andrisan@analog.com
-appveyor.yml	cristina.suteu@analog.com dan.nechita@analog.com michael.hennerich@analog.com stefan.raus@analog.com andreea.andrisan@analog.com
+/CI/	cristina.suteu@analog.com dan.nechita@analog.com michael.hennerich@analog.com stefan.raus@analog.com
+azure-pipelines.yml	cristina.suteu@analog.com dan.nechita@analog.com michael.hennerich@analog.com stefan.raus@analog.com
+appveyor.yml	cristina.suteu@analog.com dan.nechita@analog.com michael.hennerich@analog.com stefan.raus@analog.com
