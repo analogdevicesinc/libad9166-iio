@@ -10,7 +10,7 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 # Lesser General Public License for more details.
 
-cmake_minimum_required(VERSION 2.8.7)
+cmake_minimum_required(VERSION 3.10)
 project(ad9166 C)
 
 set(LIBAD9166_VERSION_MAJOR 0)
@@ -68,14 +68,19 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "FreeBSD|DragonFly|OpenBSD|NetBSD")
         set(CMAKE_REQUIRED_DEFINITIONS "-D__BSD_VISIBLE")
         add_definitions(-D__BSD_VISIBLE=1)
 endif()
-add_definitions(-D_POSIX_C_SOURCE=200809L -D__XSI_VISIBLE=500 -DLIBAD9166_EXPORTS=1)
+
+if (NOT WIN32)
+    add_definitions(-D_POSIX_C_SOURCE=201112L -D__XSI_VISIBLE=500)
+endif()
+
+add_definitions(-DLIBAD9166_EXPORTS=1)
 
 set(INSTALL_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib"
 	CACHE PATH "Installation directory for libraries")
 mark_as_advanced(INSTALL_LIB_DIR)
 
 find_library(LIBIIO_LIBRARIES iio)
-find_path(LIBIIO_INCLUDEDIR iio.h)
+find_path(LIBIIO_INCLUDEDIR iio/iio.h)
 
 set(LIBAD9166_HEADERS ad9166.h)
 
@@ -85,15 +90,22 @@ add_library(ad9166 ad9166.c
             ${LIBAD9166_HEADERS})
 enable_testing()
 add_subdirectory(test)
+
+# Use C99 on older Windows SDK versions
+if (WIN32 AND CMAKE_SYSTEM_VERSION VERSION_LESS "10.0.18362")
+    set_target_properties(ad9166 PROPERTIES C_STANDARD 99)
+else()
+    set_target_properties(ad9166 PROPERTIES C_STANDARD 11)
+endif()
 set_target_properties(ad9166 PROPERTIES
 	VERSION ${VERSION}
 	SOVERSION ${LIBAD9166_VERSION_MAJOR}
 	FRAMEWORK TRUE
 	PUBLIC_HEADER ${LIBAD9166_HEADERS}
-	C_STANDARD 99
 	C_STANDARD_REQUIRED ON
 	C_EXTENSIONS OFF
 )
+
 target_link_libraries(ad9166 LINK_PRIVATE ${LIBIIO_LIBRARIES})
 
 if (MSVC)
