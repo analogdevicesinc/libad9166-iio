@@ -30,6 +30,14 @@ pr:
     - libad9166-iio-v0
     - 20*
 
+schedules:
+- cron: "0 0 1 * *"
+  displayName: Monthly full build (libad9166-iio-v0)
+  branches:
+    include:
+    - libad9166-iio-v0
+  always: true
+
 stages:
 - stage: Builds
   #############################################
