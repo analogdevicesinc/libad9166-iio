@@ -1,42 +1,69 @@
 #!/bin/bash -e
 
-swdownloads_artifacts() {
-    local linux_dist='Fedora-34 Fedora-28 Ubuntu-18.04 Ubuntu-20.04 Ubuntu-22.04 Debian-11 Debian-12 openSUSE-15.4 CentOS-7'
-    for distribution in $linux_dist; do
-        cd "${BUILD_ARTIFACTSTAGINGDIRECTORY}/Linux-${distribution}"
-        if [ "${distribution}" == "Fedora-34" ] || [ "${distribution}" == "Fedora-28" ] || [ "${distribution}" == "CentOS-7" ]; then
-            find . -name '*.rpm' -exec mv {} ../"${distribution}_latest_${branch}_libad9166.rpm" ";"
-        else
-            find . -name '*.deb' -exec mv {} ../"${distribution}_latest_${branch}_libad9166.deb" ";"
-        fi
-        rm -r ../Linux-"${distribution}"
-    done
+release_artifacts() {
+	local linux_dist='Ubuntu-22.04 Ubuntu-24.04 Ubuntu-26.04 Debian-12 Debian-13 Fedora-42 Fedora-44 openSUSE-15.6 openSUSE-16.0'
+	cd "${BUILD_ARTIFACTSTAGINGDIRECTORY}"
+	for i in $linux_dist; do
+		cd "Linux-${i}"
+		find . -name '*.rpm' -exec mv {} ../ ";"
+		find . -name '*.deb' -exec mv {} ../ ";"
+		find . -name '*.tar.gz' -exec mv {} ../ ";"
+		cd ../
+		rm -r "Linux-${i}"
+	done
 
-	local macOS_dist='macOS-12 macOS-13-x64 macOS-13-arm64'
-	for distribution in $macOS_dist; do
-        cd "${BUILD_ARTIFACTSTAGINGDIRECTORY}/${distribution}"
-        find . -name '*.pkg' -exec mv {} ../"${distribution}_latest_${branch}_libad9166.pkg" ";"
-        rm -r ../"${distribution}"
-    done
+	local macOS_dist='macOS-15-arm64 macOS-15-x64 macOS-26-arm64 macOS-26-x64 macOS-27-arm64'
+	cd "${BUILD_ARTIFACTSTAGINGDIRECTORY}"
+	for i in $macOS_dist; do
+		cd "${i}"
+		for pkg in *.pkg; do
+			[ -f "$pkg" ] || continue
+			base="${pkg%.pkg}"
+			mv "$pkg" "${base}-${i}.pkg"
+		done
+		find . -name '*.pkg' -exec mv {} ../ ";"
+		find . -name '*.tar.gz' -exec mv {} ../ ";"
+		cd ../
+		rm -r "${i}"
+	done
 
-	local windows_dist='2019 2022'
-        for distribution in $windows_dist; do
-		cd "${BUILD_ARTIFACTSTAGINGDIRECTORY}"
-                zip -r "Windows-VS-${distribution}-x64-latest_${branch}_libad9166".zip "Windows-VS-${distribution}-x64"
-                rm -r "Windows-VS-${distribution}-x64"
-        done
-
-	local arm_dist='arm32v7 arm64v8 ppc64le x390x'
-        for distribution in $arm_dist; do
-                cd "${BUILD_ARTIFACTSTAGINGDIRECTORY}/Ubuntu-${distribution}"
-                find . -name '*.deb' -exec mv {} ../"Ubuntu-${distribution}_latest_${branch}_libad9166.deb" ";"
-                rm -r ../Ubuntu-"${distribution}"
-        done
+	cd "${BUILD_ARTIFACTSTAGINGDIRECTORY}"
+	mkdir -p Windows/include
+	cp ./Windows-VS-2022-x64/ad9166.h ./Windows/include
+	cd "Windows-VS-2022-x64"
+	rm -f ad9166.h
+	cd ../
+	mv "Windows-VS-2022-x64" Windows/
+	cd Windows
+	zip -r ../Windows.zip ./*
+	cd ../
+	rm -r Windows
 
 	cd "${BUILD_ARTIFACTSTAGINGDIRECTORY}/Libad9166-Setup-Exe"
-	mv libad9166-setup.exe ../libad9166-setup.exe
-	rm -r ../Libad9166-Setup-Exe
+	find . -name '*.exe' -exec mv {} ../ ";"
+	cd ../
+	rm -r "Libad9166-Setup-Exe"
 
+	local arm_dist='Ubuntu-22.04-arm32v7 Ubuntu-22.04-arm64v8 Ubuntu-22.04-ppc64le Ubuntu-22.04-s390x Ubuntu-26.04-arm32v7 Ubuntu-26.04-arm64v8 Ubuntu-26.04-ppc64le Ubuntu-26.04-s390x Debian-12-arm64 Debian-12-armhf Debian-13-arm64 Debian-13-armhf'
+	cd "${BUILD_ARTIFACTSTAGINGDIRECTORY}"
+	for i in $arm_dist; do
+		cd "${i}"
+		find . -name '*.deb' -exec mv {} ../ ";"
+		find . -name '*.tar.gz' -exec mv {} ../ ";"
+		cd ../
+		rm -r "${i}"
+	done
+
+	rm -rf "${BUILD_ARTIFACTSTAGINGDIRECTORY}/Artifact-manifest"
+}
+
+check_artifacts() {
+	cd build
+	while IFS= read -r line; do
+		if [ -z "${line}" ]; then continue
+		fi
+		test -f ./artifacts/"${line}" && echo "${line} exist." || echo "${line} does not exist."
+	done < "artifact_manifest.txt"
 }
 
 branch=${2}

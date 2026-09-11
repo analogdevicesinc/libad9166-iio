@@ -1,5 +1,4 @@
-name: Build libad9166-iio
-
+name: Build libad9166 across multiple os and arhitectures
 permissions:
   contents: write
   actions: write
@@ -24,7 +23,6 @@ on:
       - 20*
   schedule:
   - cron: '0 0 1 * *'
-     
 
 
 jobs:
@@ -85,7 +83,7 @@ jobs:
           echo "is_v0=$IS_V0" >> "$GITHUB_OUTPUT"
           echo "cloudsmith_version=$CLOUDSMITH_VERSION" >> "$GITHUB_OUTPUT"
           echo "download_branch=$DOWNLOAD_BRANCH" >> "$GITHUB_OUTPUT"
-    
+
 
   ############################################
   # BUILDS
@@ -123,7 +121,7 @@ jobs:
   # Check Artifacts
   #############################################
   check-artifacts:
-    # if: needs.setup.outputs.is_v0 == 'true' || needs.setup.outputs.is_release == 'true'
+    if: needs.setup.outputs.is_v0 == 'true' || needs.setup.outputs.is_release == 'true'
     needs: [setup, linux, windows, macos, arm]
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -161,12 +159,12 @@ jobs:
         with:
           name: Artifact-manifest
           path: artifact_manifest.txt
-          
+
   #############################################
   # Push to Cloudsmith
   #############################################
   push-cloudsmith:
-    # if: needs.setup.outputs.is_v0 == 'true' || needs.setup.outputs.is_release == 'true'
+    if: needs.setup.outputs.is_v0 == 'true' || needs.setup.outputs.is_release == 'true'
     needs: [setup, check-artifacts]
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -236,35 +234,35 @@ jobs:
                 adi/external "${file}"
             done
           done
-  
+
   #############################################
   # Push to GitHub Release
   #############################################
-  # push-github-release:
-  #   if: needs.setup.outputs.is-release == 'true'
-  #   needs: [config, check-artifacts]
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 10
-  #   steps:
-  #     - uses: actions/checkout@v7
-  #       with:
-  #         fetch-depth: 1
+  push-github-release:
+     if: needs.setup.outputs.is-release == 'true'
+     needs: [setup, check-artifacts]
+     runs-on: ubuntu-latest
+     timeout-minutes: 10
+     steps:
+       - uses: actions/checkout@v7
+         with:
+          fetch-depth: 1
 
-  #     - name: Download all artifacts
-  #       uses: actions/download-artifact@v8
-  #       with:
-  #         path: ${{ github.workspace }}/artifacts
+       - name: Download all artifacts
+         uses: actions/download-artifact@v8
+         with:
+           path: ${{ github.workspace }}/artifacts
 
-  #     - name: Prepare assets for release
-  #       run: ./CI/azure/prepare_assets.sh release
-  #       env:
-  #         BUILD_SOURCESDIRECTORY: ${{ github.workspace }}
-  #         BUILD_ARTIFACTSTAGINGDIRECTORY: ${{ github.workspace }}/artifacts
+       - name: Prepare assets for release
+         run: ./CI/azure/prepare_assets.sh release
+         env:
+           BUILD_SOURCESDIRECTORY: ${{ github.workspace }}
+           BUILD_ARTIFACTSTAGINGDIRECTORY: ${{ github.workspace }}/artifacts
 
-  #     - name: Create GitHub Release
-  #       uses: softprops/action-gh-release@v2
-  #       with:
-  #         draft: true
-  #         name: "libad9166 release ${{ github.ref_name }}"
-  #         files: ${{ github.workspace }}/artifacts/*
-  #         generate_release_notes: true
+       - name: Create GitHub Release
+         uses: softprops/action-gh-release@v2
+         with:
+           draft: true
+           name: "libad9166 release ${{ github.ref_name }}"
+           files: ${{ github.workspace }}/artifacts/*
+           generate_release_notes: true

@@ -61,7 +61,6 @@ jobs:
           tar xf "$TAR" -C ${{ github.workspace }}/build
           PKG=$(find ${{ github.workspace }}/build -name "*.pkg" | head -1)
           PACKAGE_TO_INSTALL="$PKG" ./CI/travis/before_install_darwin
-          ./CI/travis/before_install_darwin
       - name: Build
         run: ./CI/travis/make_darwin
       - name: Collect PKG artifacts
