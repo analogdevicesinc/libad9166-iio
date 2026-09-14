@@ -14,6 +14,8 @@ jobs:
   linux:
     name: ${{ matrix.artifact-name }}                   
     runs-on: ubuntu-latest
+    env:
+      PYTHON: ${{ github.workspace }}/.venv/bin/python3
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -106,23 +108,22 @@ jobs:
             pip3 install sphinx --break-system-packages 2>/dev/null || pip3 install sphinx
           fi
       - name: Checkout
-        uses: actions/checkout@v7 #TO DO remove the tag and put sha
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           fetch-depth: 1
       - name: Install uv 
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d
-      - name: Install py39, create venv and install dependencies 
+      - name: Install py11, create venv and install dependencies 
         run: |
           set -e 
           cd $GITHUB_WORKSPACE
-          uv python install 3.9
-          uv venv --python 3.9 --seed
+          uv python install 3.11
+          uv venv --python 3.11 --seed
           uv pip install requests
 
       - name: Get libiio from Cloudsmith
         env:
-          CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
-          PYTHON: ${{github.workspace}}/.venv/bin/python3
+          CLOUDSMITH_API_KEY: ${{ secrets.TEST_REPO_CLOUDSMITH_TOKEN }}
         run: |
           set -e
           wget https://raw.githubusercontent.com/analogdevicesinc/wiki-scripts/refs/heads/main/utils/cloudsmith_utils/cloudsmith_helper.py \
@@ -149,7 +150,7 @@ jobs:
           ./CI/travis/${{ matrix.build_script }} "${{ matrix.os_type }}" "$LIBIIO_PKG"
       - name: Upload build artifacts
         if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: ${{ matrix.artifact-name }}
           path: |
@@ -167,7 +168,7 @@ jobs:
       #     TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
       #   run: |
       #     cd build/bindings/python
-      #     $PYTHON -m twine upload dist/*.whl
+      #     $PYTHON -m twine upload dist/*.whl  
 
       # - name: Update to dev version
       #   if: matrix.artifact-name == 'Linux-Ubuntu-26.04'&& github.ref == 'refs/heads/main'

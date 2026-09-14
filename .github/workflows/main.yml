@@ -30,7 +30,7 @@ jobs:
     if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
     steps:
-      - run: gh workflow run main.yml --ref libad9166-iio-v0
+      - run: gh workflow run main.yml --ref libad9166-iio-v0 main
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -39,50 +39,32 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     outputs:
-      is_main: ${{ steps.vars.outputs.is_main }}
-      is_release: ${{ steps.vars.outputs.is_release }}
-      is_v0: ${{ steps.vars.outputs.is_v0 }}
-      cloudsmith_version: ${{ steps.vars.outputs.cloudsmith_version }}
-      download_branch: ${{ steps.vars.outputs.download_branch }}
+      build-type: ${{ steps.set.outputs.build-type }}
+      is-v0: ${{ steps.set.outputs.is-v0 }}
+      is-release: ${{ steps.set.outputs.is-release }}
+      cloudsmith-version: ${{ steps.set.outputs.cloudsmith-version }}
     steps:
       - id: vars
         shell: bash
         run: |
-          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
-            IS_MAIN=true
-          else
-            IS_MAIN=false
-          fi
-
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-            IS_RELEASE=true
-            CLOUDSMITH_VERSION="${GITHUB_REF_NAME#v}"
+            echo "build-type=Release" >> "${GITHUB_OUTPUT}"
+            echo "is-release=true" >> "${GITHUB_OUTPUT}"
+            echo "cloudsmith-version=${GITHUB_REF#refs/tags/}" >> "${GITHUB_OUTPUT}"
           else
-            IS_RELEASE=false
-            CLOUDSMITH_VERSION="0.2~${GITHUB_SHA::8}"
+            echo "build-type=RelWithDebInfo" >> "${GITHUB_OUTPUT}"
+            echo "is-release=false" >> "${GITHUB_OUTPUT}"
           fi
-
-          if [[ "${GITHUB_REF_NAME}" == "libad9166-iio-v0" ]]; then
-            IS_V0=true
-            DOWNLOAD_BRANCH="refs/heads/libad9166-v0"
-          elif [[ "${GITHUB_REF_NAME}" == "next_stable" ]]; then
-            IS_V0=false
-            DOWNLOAD_BRANCH="refs/heads/next_stable"
-          elif [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
-            IS_V0=false
-            TARGET_BRANCH="${{ github.base_ref }}"
-            TARGET_BRANCH="${TARGET_BRANCH/libad9166-iio-v0/libad9166-v0}"
-            DOWNLOAD_BRANCH="refs/heads/${TARGET_BRANCH}"
+          if [[ "${GITHUB_REF}" == "refs/heads/libad9166-iio-v0" ]]; then
+            echo "is-v0=true" >> "${GITHUB_OUTPUT}"
+            echo "cloudsmith-version=libad9166-iio-v0~latest" >> "${GITHUB_OUTPUT}"
+          elif [[ "${GITHUB_REF}" == refs/heads/staging/* ]]; then
+            echo "is-v0=false" >> "${GITHUB_OUTPUT}"
+            branch="${GITHUB_REF#refs/heads/}"
+            echo "cloudsmith-version=${branch//\//-}~latest" >> "${GITHUB_OUTPUT}"
           else
-            IS_V0=false
-            DOWNLOAD_BRANCH="refs/heads/main"
+            echo "is-v0=false" >> "${GITHUB_OUTPUT}"
           fi
-
-          echo "is_main=$IS_MAIN" >> "$GITHUB_OUTPUT"
-          echo "is_release=$IS_RELEASE" >> "$GITHUB_OUTPUT"
-          echo "is_v0=$IS_V0" >> "$GITHUB_OUTPUT"
-          echo "cloudsmith_version=$CLOUDSMITH_VERSION" >> "$GITHUB_OUTPUT"
-          echo "download_branch=$DOWNLOAD_BRANCH" >> "$GITHUB_OUTPUT"
 
 
   ############################################
@@ -117,17 +99,41 @@ jobs:
       package_version: ${{ needs.setup.outputs.download_branch }}
     secrets: inherit
 
+  libiio0:
+    needs: setup
+    uses: ./.github/workflows/build.yaml
+    secrets: inherit
+
+  #############################################
+  # Python sdist/wheel
+  #############################################
+  build-pypi:
+    # if: needs.setup.outputs.is-v0 == 'true' || needs.setup.outputs.is-release == 'true'
+    needs: [setup]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - uses: analogdevicesinc/shared-actions/pypi-build@pypi-build
+        with:
+          cmake-options: '-DPYTHON_BINDINGS=ON -DENABLE_PACKAGING=ON -DDEB_DETECT_DEPENDENCIES=ON'
+          apt-packages: 'cmake libiio-dev'
+          artifact-name: pylibad9166-dist
+
  #############################################
   # Check Artifacts
   #############################################
   check-artifacts:
-    if: needs.setup.outputs.is_v0 == 'true' || needs.setup.outputs.is_release == 'true'
-    needs: [setup, linux, windows, macos, arm]
+    # Build jobs only upload artifacts on non-PR events, so only check then. 
+    if: github.event_name != 'pull_request'
+    needs: [setup, linux, arm, macos, windows, libiio0, build-pypi]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3
         with:
           path: artifacts/
 
@@ -155,7 +161,7 @@ jobs:
           fi
 
       - name: Upload manifest
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: Artifact-manifest
           path: artifact_manifest.txt
@@ -164,13 +170,13 @@ jobs:
   # Push to Cloudsmith
   #############################################
   push-cloudsmith:
-    if: needs.setup.outputs.is_v0 == 'true' || needs.setup.outputs.is_release == 'true'
+    # if: needs.setup.outputs.is_v0 == 'true' || needs.setup.outputs.is_release == 'true'
     needs: [setup, check-artifacts]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3
         with:
           path: ${{ github.workspace }}/artifacts
 
@@ -179,59 +185,42 @@ jobs:
 
       - name: Upload to Cloudsmith
         env:
-          CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
+          CLOUDSMITH_API_KEY: ${{ secrets.TEST_REPO_CLOUDSMITH_TOKEN }}
         run: |
           set -e
-
-          # Retry wrapper for network calls
-          cloudsmith_push() {
-            local i
-            for i in 1 2 3; do
-              cloudsmith push raw "$@" && return 0
-              echo "Attempt ${i}/3 failed, retrying in 5s..."
-              sleep 5
-            done
-            return 1
-          }
-
-          VERSION="${{ needs.setup.outputs.cloudsmith_version }}"
+          VERSION="${{ needs.setup.outputs.cloudsmith-version }}"
           ARTIFACTS="${{ github.workspace }}/artifacts"
-
           for dir in "${ARTIFACTS}"/*/; do
             tag=$(basename "${dir}")
             [[ "${tag}" == "Artifact manifest" ]] && continue
-
-            # Windows: zip the whole directory and push as one archive
             if [[ "${tag}" == Windows-* ]]; then
-              zip -r -j "${ARTIFACTS}/${tag}.zip" "${dir}"
-              cloudsmith_push --republish \
+              cd "${ARTIFACTS}"
+              zip -r "${tag}.zip" "${tag}"
+              rm -r "${tag}"
+              cloudsmith push raw --republish \
                 --tags "${tag}" \
                 --version "${VERSION}" \
-                adi/external "${ARTIFACTS}/${tag}.zip"
-              rm "${ARTIFACTS}/${tag}.zip"
+                adi/test-alin-repo "${tag}.zip"
+              rm "${tag}.zip"
+              cd -
               continue
             fi
-
-            # Linux / macOS: push each file individually with a stable name
             for file in "${dir}"*; do
               [[ -f "${file}" ]] || continue
               filename=$(basename "${file}")
-
               # Strip git hash (.g<hex>) so the name is stable across commits
-              stable=$(echo "${filename}" | sed -E 's/\.g[0-9a-f]{7,12}//')
+              stable=$(echo "${filename}" | sed -e 's/\.g[0-9a-f]{7,12\}//')
               ext="${stable##*.}"
               stable="${stable%.${ext}}"
-
               # macOS .pkg files don't include arch in the name; add tag
               if [[ "${filename}" != *"${tag}"* ]]; then
                 stable="${stable}-${tag}"
               fi
-
-              cloudsmith_push --republish \
+              cloudsmith push raw --republish \
                 --name "${stable}.${ext}" \
                 --tags "${tag}" \
                 --version "${VERSION}" \
-                adi/external "${file}"
+                adi/test-alin-repo "${file}"
             done
           done
 
@@ -244,12 +233,12 @@ jobs:
      runs-on: ubuntu-latest
      timeout-minutes: 10
      steps:
-       - uses: actions/checkout@v7
+       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
          with:
           fetch-depth: 1
 
        - name: Download all artifacts
-         uses: actions/download-artifact@v8
+         uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3
          with:
            path: ${{ github.workspace }}/artifacts
 
@@ -260,7 +249,7 @@ jobs:
            BUILD_ARTIFACTSTAGINGDIRECTORY: ${{ github.workspace }}/artifacts
 
        - name: Create GitHub Release
-         uses: softprops/action-gh-release@v2
+         uses: softprops/action-gh-release@a6c7483a42ee9d5daced968f6c217562cd680f7f
          with:
            draft: true
            name: "libad9166 release ${{ github.ref_name }}"
