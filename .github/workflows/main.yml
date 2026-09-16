@@ -99,7 +99,7 @@ jobs:
       package_version: ${{ needs.setup.outputs.download_branch }}
     secrets: inherit
 
-  libiio0:
+  build_with_libiio0:
     needs: setup
     uses: ./.github/workflows/build.yaml
     secrets: inherit
@@ -128,7 +128,7 @@ jobs:
   check-artifacts:
     # Build jobs only upload artifacts on non-PR events, so only check then. 
     if: github.event_name != 'pull_request'
-    needs: [setup, linux, arm, macos, windows, libiio0, build-pypi]
+    needs: [setup, linux, arm, macos, windows, build_with_libiio0, build-pypi]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

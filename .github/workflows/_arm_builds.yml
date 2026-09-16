@@ -100,8 +100,8 @@ jobs:
         with:
           name: ${{ matrix.artifact-name }}
           path: |
-            build/*.deb
-            build/*.tar.gz
+            build/*9166*.deb
+            build/*9166*.tar.gz
 
   cross-arch:
     name: ${{ matrix.artifact-name }}
@@ -182,5 +182,5 @@ jobs:
         with:
           name: ${{ matrix.artifact-name }}
           path: |
-            build/*.deb
-            build/*.tar.gz
+            build/*9166*.deb
+            build/*9166*.tar.gz
