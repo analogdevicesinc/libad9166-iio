@@ -44,7 +44,7 @@ jobs:
       is-release: ${{ steps.set.outputs.is-release }}
       cloudsmith-version: ${{ steps.set.outputs.cloudsmith-version }}
     steps:
-      - id: vars
+      - id: set
         shell: bash
         run: |
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
@@ -60,8 +60,7 @@ jobs:
             echo "cloudsmith-version=libad9166-iio-v0~latest" >> "${GITHUB_OUTPUT}"
           elif [[ "${GITHUB_REF}" == refs/heads/staging/* ]]; then
             echo "is-v0=false" >> "${GITHUB_OUTPUT}"
-            branch="${GITHUB_REF#refs/heads/}"
-            echo "cloudsmith-version=${branch//\//-}~latest" >> "${GITHUB_OUTPUT}"
+            echo "cloudsmith-version=test-v0" >> "${GITHUB_OUTPUT}"
           else
             echo "is-v0=false" >> "${GITHUB_OUTPUT}"
           fi
@@ -107,20 +106,20 @@ jobs:
   #############################################
   # Python sdist/wheel
   #############################################
-  build-pypi:
-    # if: needs.setup.outputs.is-v0 == 'true' || needs.setup.outputs.is-release == 'true'
-    needs: [setup]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 1
-      - uses: analogdevicesinc/shared-actions/pypi-build@pypi-build
-        with:
-          cmake-options: '-DPYTHON_BINDINGS=ON -DENABLE_PACKAGING=ON -DDEB_DETECT_DEPENDENCIES=ON'
-          apt-packages: 'cmake libiio-dev'
-          artifact-name: pylibad9166-dist
+  # build-pypi:
+  #   # if: needs.setup.outputs.is-v0 == 'true' || needs.setup.outputs.is-release == 'true'
+  #   needs: [setup]
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 10
+  #   steps:
+  #     - uses: actions/checkout@v7
+  #       with:
+  #         fetch-depth: 1
+  #     - uses: analogdevicesinc/shared-actions/pypi-build@pypi-build
+  #       with:
+  #         cmake-options: '-DPYTHON_BINDINGS=ON -DENABLE_PACKAGING=ON -DDEB_DETECT_DEPENDENCIES=ON'
+  #         apt-packages: 'cmake libiio-dev'
+  #         artifact-name: pylibad9166-dist
 
  #############################################
   # Check Artifacts
@@ -128,7 +127,7 @@ jobs:
   check-artifacts:
     # Build jobs only upload artifacts on non-PR events, so only check then. 
     if: github.event_name != 'pull_request'
-    needs: [setup, linux, arm, macos, windows, build_with_libiio0, build-pypi]
+    needs: [setup, linux, arm, macos, windows, build_with_libiio0]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
