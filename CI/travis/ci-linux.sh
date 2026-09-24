@@ -11,6 +11,14 @@ handle_centos() {
 
 }
 
+handle_fedora() {
+	local package=$1
+	dnf install -y ./$package
+	export LD_LIBRARY_PATH=/usr/local/lib64/
+	export PKG_CONFIG_PATH=/usr/local/lib64/pkgconfig
+	export CMAKE_OPTIONS="-DPYTHON_BINDINGS=ON -DENABLE_PACKAGING=ON .."
+}
+
 handle_default() {
 	local package=$1
 	DEBIAN_FRONTEND=noninteractive apt-get install -y rpm
@@ -26,17 +34,10 @@ handle_opensuse() {
 
 handle_"$1" "$2"
 
-python3 -m pip install pylibiio --no-binary :all:
 # Build project
 mkdir -p build
 cd build
 cmake $CMAKE_OPTIONS
 sudo make && sudo make package && make test
 sudo make install
-ldconfig
-cd ..
-cd bindings/python
-pip install -r requirements_dev.txt
-export LD_LIBRARY_PATH=/usr/local/lib/
-python3 -m pip install pytest
-python3 -m pytest -vs --skip-scan
+ldconfig 
