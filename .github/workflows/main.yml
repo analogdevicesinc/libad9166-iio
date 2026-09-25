@@ -105,11 +105,6 @@ jobs:
       libiio-version: ${{ needs.setup.outputs.libiio-version}}
     secrets: inherit
 
-  build_with_libiio0:
-    needs: setup
-    uses: ./.github/workflows/build.yaml
-    secrets: inherit
-
   #############################################
   # Python sdist/wheel
   #############################################
@@ -157,7 +152,7 @@ jobs:
       !cancelled() &&
       !contains(needs.*.result, 'failure') &&
       (needs.setup.outputs.is-v0 == 'true' || needs.setup.outputs.is-release == 'true')
-    needs: [setup, linux, arm, macos, windows, build_with_libiio0, build-pypi]
+    needs: [setup, linux, arm, macos, windows, build-pypi]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

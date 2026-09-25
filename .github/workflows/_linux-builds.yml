@@ -154,4 +154,54 @@ jobs:
           name: ${{ matrix.artifact-name }}
           path: |
             build/*9166*.${{matrix.package_type}}
+
+  linux-upstream:
+    name: upstream-ubuntu-amd64
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      APP_NAME: libad9166
+      ARTIFACT_NAME: libad9166-libiio-upstream
+    defaults:
+      run:
+        working-directory: ${{ env.APP_NAME }}
+    steps:
+      - name: Checkout code repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          path: ${{ env.APP_NAME }}
+
+      - name: Identify version
+        id: set_version
+        run: |
+          # Extract version from CMakeLists.txt project() line
+          cmake_version=$(grep -oP 'project\s*\([^)]*VERSION\s+\K[0-9]+\.[0-9]+(\.[0-9]+)?' CMakeLists.txt)
+          if [[ -z "$cmake_version" ]]; then
+            echo "Failed to extract version from CMakeLists.txt, using default"
+            cmake_version="0.0.1+${{ github.sha }}"
+          fi
+          echo "Version to use: $cmake_version"
+          echo "version=$cmake_version" >> "$GITHUB_OUTPUT"
+
+      - name: Create .deb package
+        run: |
+          .github/scripts/create_debian.sh ${{ steps.set_version.outputs.version }}
+
+      - name: Copy debian artifacts
+        run: |
+          mkdir -p artifacts
+          cp ../*.deb ../*.dsc ../*.debian.tar.xz ../*.orig.tar.gz artifacts/
+          ls -la artifacts/
+
+      - name: Upload debian artifacts to github
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.ARTIFACT_NAME }}-ubuntu
+          path: |
+            ${{ env.APP_NAME }}/artifacts/*.deb
+            ${{ env.APP_NAME }}/artifacts/*.dsc
+            ${{ env.APP_NAME }}/artifacts/*.debian.tar.xz
+            ${{ env.APP_NAME }}/artifacts/*.orig.tar.gz
+          if-no-files-found: error
         
