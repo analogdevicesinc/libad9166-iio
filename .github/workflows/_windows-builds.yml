@@ -26,6 +26,7 @@ jobs:
       ARCH: 'x64'
       BUILD_ARTIFACTSTAGINGDIRECTORY: ${{ github.workspace }}\artifacts
       GH_TOKEN: ${{ github.token }}
+      PYTHON: ${{ github.workspace }}\.venv\Scripts\python.exe
     steps:
       - name: Checkout code repository
         uses: actions/checkout@v6
@@ -37,14 +38,37 @@ jobs:
         shell: pwsh
         run: New-Item -ItemType Directory -Force -Path $env:BUILD_ARTIFACTSTAGINGDIRECTORY | Out-Null
 
-      - name: Download and stage libiio (Windows)
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10
+
+      - name: Install py11, create venv and install dependencies
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
+          cd $env:GITHUB_WORKSPACE
+          uv python install 3.11
+          uv venv --python 3.11 --seed
+          uv pip install requests
+
+      - name: Download and stage libiio (Windows)
+        shell: pwsh
+        env:
+          CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
+        run: |
+          $ErrorActionPreference = "Stop"
           New-Item -ItemType Directory -Force -Path build | Out-Null
+          New-Item -ItemType Directory -Force -Path libiio_pkg | Out-Null
           # Replaces the Azure cross-pipeline download. build_win.ps1 expects
           # libiio.lib and iio.h in the build/ directory, and the packaging
           # steps expect libiio.dll in build/.
-          gh release download "${{ inputs.libiio_version }}" --repo analogdevicesinc/libiio --pattern "Windows.zip" --dir libiio_pkg
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/analogdevicesinc/wiki-scripts/refs/heads/main/utils/cloudsmith_utils/cloudsmith_helper.py" -OutFile "$env:RUNNER_TEMP\cloudsmith_helper.py"
+          Push-Location libiio_pkg
+          & $env:PYTHON "$env:RUNNER_TEMP\cloudsmith_helper.py" `
+            --method get_artifacts_from_location `
+            --repo external `
+            --package_version "${{ inputs.libiio_version }}" `
+            --package_name "Windows.zip"
+          Pop-Location
           Expand-Archive -Force libiio_pkg\Windows.zip -DestinationPath libiio_pkg\extracted
           Get-ChildItem -Recurse libiio_pkg\extracted -Include libiio.lib,iio.h,libiio.dll |
             ForEach-Object { Copy-Item $_.FullName build\ -Force }
