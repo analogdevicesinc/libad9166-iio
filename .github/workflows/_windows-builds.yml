@@ -1,10 +1,5 @@
 name: Windows builds
 
-# Reusable workflow. Port of azure-pipelines.yml jobs "WindowsBuilds" and
-# "GenerateSetupExe". The PowerShell scripts under CI/ are invoked
-# unchanged; BUILD_ARTIFACTSTAGINGDIRECTORY (an Azure variable the scripts
-# rely on) is exported to a real path here.
-
 on:
   workflow_call:
     inputs:
@@ -39,7 +34,7 @@ jobs:
         run: New-Item -ItemType Directory -Force -Path $env:BUILD_ARTIFACTSTAGINGDIRECTORY | Out-Null
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10
+        uses: astral-sh/setup-uv@v10.2.0
 
       - name: Install py11, create venv and install dependencies
         shell: pwsh

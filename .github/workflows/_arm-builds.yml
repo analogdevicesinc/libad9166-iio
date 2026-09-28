@@ -1,9 +1,5 @@
 name: ARM builds
 
-# Reusable workflow. Port of azure-pipelines.yml job "ARMBuilds".
-# Cross-builds for ppc64le / s390x / arm32v7 / arm64v8 via QEMU + Docker
-# using CI/travis/ci-ubuntu.sh.
-
 on:
   workflow_call:
     inputs:
@@ -47,7 +43,7 @@ jobs:
           fetch-depth: 1
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10
+        uses: astral-sh/setup-uv@v10.2.0
 
       - name: Install py11, create venv and install dependencies
         run: |
