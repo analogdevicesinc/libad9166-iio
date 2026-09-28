@@ -1,0 +1,83 @@
+name: ARM builds
+
+# Reusable workflow. Port of azure-pipelines.yml job "ARMBuilds".
+# Cross-builds for ppc64le / s390x / arm32v7 / arm64v8 via QEMU + Docker
+# using CI/travis/ci-ubuntu.sh.
+
+on:
+  workflow_call:
+    inputs:
+      build_ref:
+        required: true
+        type: string
+      libiio_version:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  arm:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: 'Ubuntu-ppc64le'
+            arch: ppc64le
+            image: 'tfcollins/libiio_ubuntu_18_04-ci-arm-ppc:latest'
+          - name: 'Ubuntu-x390x'
+            arch: s390x
+            image: 'tfcollins/libiio_ubuntu_18_04-ci-arm-ppc:latest'
+          - name: 'Ubuntu-arm32v7'
+            arch: arm
+            image: 'tfcollins/libiio_ubuntu_18_04-ci-arm-ppc:latest'
+          - name: 'Ubuntu-arm64v8'
+            arch: aarch64
+            image: 'tfcollins/libiio_ubuntu_18_04-ci-arm-ppc:latest'
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout code repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.build_ref }}
+          fetch-depth: 1
+
+      - name: Download libiio release asset (best effort)
+        run: |
+          mkdir -p build
+          gh release download "${{ inputs.libiio_version }}" \
+            --repo analogdevicesinc/libiio \
+            --pattern "*-${{ matrix.name }}.deb" \
+            --dir build/ \
+            || echo "No libiio deb for ${{ matrix.name }} in ${{ inputs.libiio_version }}; ci-ubuntu.sh will install libiio from apt."
+          ls -la build/ || true
+
+      - name: Setup QEMU
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y qemu-user-static
+          sudo sysctl kernel.randomize_va_space=0
+          sudo docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+
+      - name: Build
+        run: |
+          set -e
+          sudo docker run --platform "linux/${{ matrix.arch }}" --rm -t --privileged \
+            -e ARTIFACTNAME='${{ matrix.name }}' \
+            -v "$PWD":"/ci" \
+            -v "/usr/bin/qemu-${{ matrix.arch }}-static":"/usr/bin/qemu-${{ matrix.arch }}-static" \
+            "${{ matrix.image }}" \
+            /bin/bash -c "cd /ci/ && chmod +x ./CI/travis/ci-ubuntu.sh && ./CI/travis/ci-ubuntu.sh"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.name }}
+          path: |
+            build/*.deb
+            build/*.rpm
+          if-no-files-found: error

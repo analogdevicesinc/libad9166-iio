@@ -1,0 +1,155 @@
+name: Build and Deploy libad9166-iio
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - next_stable
+      - libad9166-iio-v0
+      - 'staging/*'
+      - '20*'
+  pull_request:
+    branches:
+      - main
+      - next_stable
+      - libad9166-iio-v0
+      - '20*'
+  schedule:
+    - cron: '0 0 1 * *'
+
+env:
+  LIBIIO_VERSION: ''
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      build_ref: ${{ steps.vars.outputs.build_ref }}
+      source_branch_name: ${{ steps.vars.outputs.source_branch_name }}
+      libiio_version: ${{ steps.vars.outputs.libiio_version }}
+      is_main: ${{ steps.vars.outputs.is_main }}
+      is_release_tag: ${{ steps.vars.outputs.is_release_tag }}
+      do_deploy: ${{ steps.vars.outputs.do_deploy }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Compute build ref and libiio version
+        id: vars
+        run: |
+          set -e
+          event='${{ github.event_name }}'
+          ref='${{ github.ref }}'
+          ref_name='${{ github.ref_name }}'
+          target='${{ github.base_ref }}'   # PR target branch (empty otherwise)
+
+          # Azure's monthly schedule targeted libad9166-iio-v0; GitHub
+          # schedules run on the default branch, so force the ref here.
+          if [ "$event" = "schedule" ]; then
+            build_ref='refs/heads/libad9166-iio-v0'
+            ref_name='libad9166-iio-v0'
+          else
+            build_ref="$ref"
+          fi
+
+          # Select the libiio release. Preserves the Azure downloadBranch
+          # intent: the v0 line pairs with libiio v0, everything else with
+          # the latest libiio release. Overridable via env.LIBIIO_VERSION.
+          version='${{ env.LIBIIO_VERSION }}'
+          if [ -z "$version" ]; then
+            if [ "$ref_name" = "libad9166-iio-v0" ] || [ "$target" = "libad9166-iio-v0" ]; then
+              version='v0.26'
+            else
+              version="$(gh release view --repo analogdevicesinc/libiio --json tagName --jq .tagName)"
+            fi
+          fi
+
+          is_main=false
+          [ "$ref" = "refs/heads/main" ] && is_main=true
+
+          is_release_tag=false
+          case "$ref" in refs/tags/v*) is_release_tag=true ;; esac
+
+          # Deploy to SWDownloads only on main or libad9166-iio-v0.
+          do_deploy=false
+          if [ "$is_main" = "true" ] || [ "$ref_name" = "libad9166-iio-v0" ]; then
+            do_deploy=true
+          fi
+
+          {
+            echo "build_ref=$build_ref"
+            echo "source_branch_name=$ref_name"
+            echo "libiio_version=$version"
+            echo "is_main=$is_main"
+            echo "is_release_tag=$is_release_tag"
+            echo "do_deploy=$do_deploy"
+          } >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
+  linux:
+    needs: setup
+    uses: ./.github/workflows/_linux-builds.yml
+    with:
+      build_ref: ${{ needs.setup.outputs.build_ref }}
+      libiio_version: ${{ needs.setup.outputs.libiio_version }}
+      is_main: ${{ needs.setup.outputs.is_main == 'true' }}
+      is_release_tag: ${{ needs.setup.outputs.is_release_tag == 'true' }}
+    secrets: inherit
+
+  arm:
+    needs: setup
+    uses: ./.github/workflows/_arm-builds.yml
+    with:
+      build_ref: ${{ needs.setup.outputs.build_ref }}
+      libiio_version: ${{ needs.setup.outputs.libiio_version }}
+    secrets: inherit
+
+  macos:
+    needs: setup
+    uses: ./.github/workflows/_macos-builds.yml
+    with:
+      build_ref: ${{ needs.setup.outputs.build_ref }}
+      libiio_version: ${{ needs.setup.outputs.libiio_version }}
+    secrets: inherit
+
+  windows:
+    needs: setup
+    uses: ./.github/workflows/_windows-builds.yml
+    with:
+      build_ref: ${{ needs.setup.outputs.build_ref }}
+      libiio_version: ${{ needs.setup.outputs.libiio_version }}
+    secrets: inherit
+
+  deploy:
+    needs: [setup, linux, arm, macos, windows]
+    if: ${{ needs.setup.outputs.do_deploy == 'true' }}
+    runs-on: ubuntu-latest
+    env:
+      BUILD_ARTIFACTSTAGINGDIRECTORY: ${{ github.workspace }}/artifacts
+    steps:
+      - name: Checkout code repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: ${{ env.BUILD_ARTIFACTSTAGINGDIRECTORY }}
+
+      - name: Prepare artifacts for SWDownloads
+        run: ./CI/azure/prepare_assets.sh swdownloads "${{ needs.setup.outputs.source_branch_name }}"
+
+      - name: Push artifacts to SW Downloads
+        env:
+          SERVER_ADDRESS: ${{ secrets.SWDOWNLOADS_SERVER_ADDRESS }}
+          SWDOWNLOADS_KEY: ${{ secrets.SWDOWNLOADS_KEY }}
+        run: |
+          echo "$SWDOWNLOADS_KEY" > id_rsa
+          chmod 600 id_rsa
+          scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -o HostKeyAlgorithms=+ssh-dss -i id_rsa \
+            -r "$BUILD_ARTIFACTSTAGINGDIRECTORY"/* "$SERVER_ADDRESS"

@@ -1,0 +1,136 @@
+name: Linux builds
+
+on:
+  workflow_call:
+    inputs:
+      build_ref:
+        required: true
+        type: string
+      libiio_version:
+        required: true
+        type: string
+      is_main:
+        required: false
+        type: boolean
+        default: false
+      is_release_tag:
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: 'Linux-Ubuntu-18.04'
+            image: 'tfcollins/libiio_ubuntu_18_04-ci:latest'
+            os_type: default
+            ext: deb
+          - name: 'Linux-Ubuntu-20.04'
+            image: 'tfcollins/libiio_ubuntu_20_04-ci:latest'
+            os_type: default
+            ext: deb
+          - name: 'Linux-Ubuntu-22.04'
+            image: 'tfcollins/libiio_ubuntu_22_04-ci:latest'
+            os_type: default
+            ext: deb
+          - name: 'Linux-Debian-11'
+            image: 'tfcollins/libiio_debian_bullseye-ci:latest'
+            os_type: default
+            ext: deb
+          - name: 'Linux-Debian-12'
+            image: 'tfcollins/libiio_debian_bookworm-ci:latest'
+            os_type: default
+            ext: deb
+          - name: 'Linux-CentOS-7'
+            image: 'tfcollins/libiio_centos_7-ci:latest'
+            os_type: centos
+            ext: rpm
+          - name: 'Linux-Fedora-28'
+            image: 'tfcollins/libiio_fedora_28-ci:latest'
+            os_type: centos
+            ext: rpm
+          - name: 'Linux-Fedora-34'
+            image: 'tfcollins/libiio_fedora_34-ci:latest'
+            os_type: centos
+            ext: rpm
+          - name: 'Linux-openSUSE-15.4'
+            image: 'tfcollins/libiio_opensuse_15_4-ci:latest'
+            os_type: opensuse
+            ext: rpm
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout code repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.build_ref }}
+          fetch-depth: 1
+
+      - name: Download libiio release asset (best effort)
+        run: |
+          mkdir -p build
+          # Replaces the Azure cross-pipeline DownloadPipelineArtifact.
+          # If the selected libiio release has no matching package for this
+          # distro, ci-linux.sh falls back to installing libiio from the
+          # distro's own package manager.
+          gh release download "${{ inputs.libiio_version }}" \
+            --repo analogdevicesinc/libiio \
+            --pattern "*-${{ matrix.name }}.${{ matrix.ext }}" \
+            --dir build/ \
+            || echo "No libiio ${{ matrix.ext }} asset for ${{ matrix.name }} in ${{ inputs.libiio_version }}; ci-linux.sh will install libiio from distro packages."
+          ls -la build/ || true
+
+      - name: Build
+        run: |
+          set -e
+          sudo docker run --rm -t --privileged \
+            -e ARTIFACTNAME='${{ matrix.name }}' \
+            -v "$PWD":"/ci" "${{ matrix.image }}" \
+            /bin/bash -c "cd /ci/ && chmod +x ./CI/travis/ci-linux.sh && ./CI/travis/ci-linux.sh ${{ matrix.os_type }} /ci/build/*.${{ matrix.ext }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.name }}
+          path: |
+            build/*.deb
+            build/*.rpm
+          if-no-files-found: error
+          
+      - name: Install wheel and twine
+        if: matrix.name == 'Linux-Ubuntu-20.04'
+        run: |
+          sudo pip install setuptools wheel twine build
+          cd build/bindings/python
+          sudo python setup.py bdist_wheel
+
+      - name: Deploy python package (PyPI, on tag)
+        if: ${{ matrix.name == 'Linux-Ubuntu-20.04' && inputs.is_release_tag }}
+        env:
+          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+        run: |
+          cd build/bindings/python
+          python -m twine upload dist/*.whl
+
+      - name: Update to dev version and deploy (Test PyPI, on main)
+        if: ${{ matrix.name == 'Linux-Ubuntu-20.04' && inputs.is_main }}
+        env:
+          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
+          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+        run: |
+          cd build/bindings/python
+          sudo rm -f ./dist/*.whl
+          sudo pip3 install --upgrade requests
+          sudo pip install invoke
+          sudo invoke bumpversion-test
+          sudo python -m build
+          ls -al
+          python -m twine upload --repository-url https://test.pypi.org/legacy/ --skip-existing dist/*.whl

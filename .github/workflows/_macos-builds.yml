@@ -1,0 +1,51 @@
+name: macOS builds
+
+on:
+  workflow_call:
+    inputs:
+      build_ref:
+        required: true
+        type: string
+      libiio_version:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    runs-on: macos-13-xlarge
+    env:
+      PACKAGE_TO_INSTALL: 'build/*.pkg'
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout code repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.build_ref }}
+          fetch-depth: 1
+
+      - name: Download libiio release asset
+        run: |
+          mkdir -p build
+          gh release download "${{ inputs.libiio_version }}" \
+            --repo analogdevicesinc/libiio \
+            --pattern "*-macOS-13-arm64.pkg" \
+            --dir build/
+          ls -la build/
+
+      - name: Install dependencies
+        run: ./CI/travis/before_install_darwin
+
+      - name: Build
+        run: ./CI/travis/make_darwin
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: macOS-13-arm64
+          path: |
+            build/*.pkg
+            build_tar/*.pkg
+          if-no-files-found: error
