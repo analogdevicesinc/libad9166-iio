@@ -1,4 +1,4 @@
-name: Windows builds
+name: Windows Builds
 
 on:
   workflow_call:
@@ -10,67 +10,54 @@ on:
         required: true
         type: string
 
-permissions:
-  contents: read
-
 jobs:
-  windows_build:
-    runs-on: windows-2022
+  msvc:
+    name: ${{ matrix.artifact-name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: Visual Studio 17 2022
+            vmImage: windows-2022
+            arch: x64
+            artifact-name: Windows-VS-2022-x64
+            
+    runs-on: ${{ matrix.vmImage }}
+    timeout-minutes: 15
     env:
-      COMPILER: 'Visual Studio 17 2022'
-      ARCH: 'x64'
-      BUILD_ARTIFACTSTAGINGDIRECTORY: ${{ github.workspace }}\artifacts
-      GH_TOKEN: ${{ github.token }}
-      PYTHON: ${{ github.workspace }}\.venv\Scripts\python.exe
+      COMPILER: ${{ matrix.compiler }}
+      ARCH: ${{ matrix.arch }}
+      USE_CSHARP: 'ON'
+      BUILD_ARTIFACTSTAGINGDIRECTORY: ${{ github.workspace }}\staging
     steps:
-      - name: Checkout code repository
-        uses: actions/checkout@v6
+      - name: Checkout
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1
-
-      - name: Create artifact staging directory
-        shell: pwsh
-        run: New-Item -ItemType Directory -Force -Path $env:BUILD_ARTIFACTSTAGINGDIRECTORY | Out-Null
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v10.2.0
-
-      - name: Install py11, create venv and install dependencies
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-          cd $env:GITHUB_WORKSPACE
-          uv python install 3.11
-          uv venv --python 3.11 --seed
-          uv pip install requests
-
-      - name: Download and stage libiio (Windows)
-        shell: pwsh
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+      - run: pip install requests sphinx
+      - name: Get libiio from Cloudsmith
         env:
           CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
+        shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          New-Item -ItemType Directory -Force -Path build | Out-Null
-          New-Item -ItemType Directory -Force -Path libiio_pkg | Out-Null
-          # Replaces the Azure cross-pipeline download. build_win.ps1 expects
-          # libiio.lib and iio.h in the build/ directory, and the packaging
-          # steps expect libiio.dll in build/.
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/analogdevicesinc/wiki-scripts/refs/heads/main/utils/cloudsmith_utils/cloudsmith_helper.py" -OutFile "$env:RUNNER_TEMP\cloudsmith_helper.py"
-          Push-Location libiio_pkg
-          & $env:PYTHON "$env:RUNNER_TEMP\cloudsmith_helper.py" `
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/analogdevicesinc/wiki-scripts/refs/heads/main/utils/cloudsmith_utils/cloudsmith_helper.py" `
+            -OutFile "$env:TEMP\cloudsmith_helper.py"
+          if (!(Test-Path build)) { mkdir build }
+          cd build
+          python "$env:TEMP\cloudsmith_helper.py" `
             --method get_artifacts_from_location `
             --repo external `
-            --package_version "${{ inputs.libiio-version }}" `
-            --package_name "Windows.zip"
-          Pop-Location
-          Expand-Archive -Force libiio_pkg\Windows.zip -DestinationPath libiio_pkg\extracted
-          Get-ChildItem -Recurse libiio_pkg\extracted -Include libiio.lib,iio.h,libiio.dll |
-            ForEach-Object { Copy-Item $_.FullName build\ -Force }
-          Get-ChildItem build\
-
-      - name: Dependencies
+            --package_version "${{inputs.libiio-version}}" `
+            --package_name "${{ matrix.artifact-name }}.zip"
+          7z e "${{ matrix.artifact-name }}.zip" -o"." -y
+      - name: Create staging directory
         shell: pwsh
-        run: .\CI\install_deps_win.ps1
+        run: New-Item -ItemType Directory -Force -Path "$env:BUILD_ARTIFACTSTAGINGDIRECTORY"
 
       - name: Build
         shell: pwsh
@@ -79,64 +66,64 @@ jobs:
       - name: Copy libraries
         shell: pwsh
         run: |
-          if (Test-Path build\Release) {
-            Copy-Item build\Release\* $env:BUILD_ARTIFACTSTAGINGDIRECTORY -Recurse -Force
-          }
+          Copy-Item -Path "build\Release\*" -Destination "$env:BUILD_ARTIFACTSTAGINGDIRECTORY" -Force
 
       - name: Copy ad9166.h header
         shell: pwsh
         run: |
-          if (Test-Path ad9166.h) { Copy-Item ad9166.h $env:BUILD_ARTIFACTSTAGINGDIRECTORY -Force }
+          Copy-Item -Path "ad9166.h" -Destination "$env:BUILD_ARTIFACTSTAGINGDIRECTORY"
 
       - name: Copy .exe files
         shell: pwsh
         run: |
-          Get-ChildItem build\*.exe -ErrorAction SilentlyContinue |
-            Copy-Item -Destination $env:BUILD_ARTIFACTSTAGINGDIRECTORY -Force
+          Copy-Item -Path "build\*.exe" -Destination "$env:BUILD_ARTIFACTSTAGINGDIRECTORY" -ErrorAction SilentlyContinue
 
       - name: Copy libiio.dll
         shell: pwsh
         run: |
-          if (Test-Path build\libiio.dll) { Copy-Item build\libiio.dll $env:BUILD_ARTIFACTSTAGINGDIRECTORY -Force }
+          Copy-Item -Path "build\libiio.dll" -Destination "$env:BUILD_ARTIFACTSTAGINGDIRECTORY"
 
       - name: Copy dependencies
         shell: pwsh
         run: .\CI\publish_deps.ps1
 
-      - name: Upload artifact
+      - name: Upload build artifacts
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v7
         with:
-          name: Windows-VS-2022-x64
-          path: ${{ env.BUILD_ARTIFACTSTAGINGDIRECTORY }}
-          if-no-files-found: error
+          name: ${{ matrix.artifact-name }}
+          path: ${{ github.workspace }}\staging
 
-  generate_setup_exe:
-    needs: windows_build
-    runs-on: windows-2019
+  generate-setup-exe:
+    name: Generate Setup Exe
+    needs: msvc
+    if: github.event_name != 'pull_request'
+    runs-on: windows-2022
     env:
-      BUILD_ARTIFACTSTAGINGDIRECTORY: ${{ github.workspace }}\artifacts
+      BUILD_ARTIFACTSTAGINGDIRECTORY: ${{ github.workspace }}\staging
+
     steps:
-      - name: Checkout code repository
-        uses: actions/checkout@v6
+      - name: Checkout
+        uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
-      - name: Download all build artifacts
-        uses: actions/download-artifact@v7
+      - name: Download Windows build artifacts
+        uses: actions/download-artifact@v8
         with:
-          path: ${{ env.BUILD_ARTIFACTSTAGINGDIRECTORY }}
+          name: Windows-VS-2022-x64
+          path: ${{ github.workspace }}\staging\Windows-VS-2022-x64
 
-      - name: List staged artifacts
-        shell: bash
-        run: ls -al "$BUILD_ARTIFACTSTAGINGDIRECTORY"
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup -y
 
       - name: Generate libad9166-setup.exe
         shell: pwsh
         run: .\CI\generate_exe.ps1
 
-      - name: Upload artifact
+      - name: Upload setup exe
         uses: actions/upload-artifact@v7
         with:
           name: Libad9166-Setup-Exe
-          path: ${{ env.BUILD_ARTIFACTSTAGINGDIRECTORY }}
-          if-no-files-found: error
+          path: ${{ github.workspace }}\staging

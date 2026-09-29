@@ -9,56 +9,103 @@ on:
       libiio-version:
         required: true
         type: string
-
-permissions:
-  contents: read
-
 jobs:
   linux:
+    name: ${{ matrix.artifact-name }}                   
     runs-on: ubuntu-latest
     env:
-      PYTHON: ${{ github.workspace }}/.venv/bin/python
+      PYTHON: ${{ github.workspace }}/.venv/bin/python3
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         include:
-          - name: 'Linux-Ubuntu-18.04'
-            image: 'tfcollins/libiio_ubuntu_18_04-ci:latest'
-            os_type: default
-            ext: deb
-          - name: 'Linux-Ubuntu-20.04'
-            image: 'tfcollins/libiio_ubuntu_20_04-ci:latest'
-            os_type: default
-            ext: deb
-          - name: 'Linux-Ubuntu-22.04'
-            image: 'tfcollins/libiio_ubuntu_22_04-ci:latest'
-            os_type: default
-            ext: deb
-          - name: 'Linux-Debian-11'
-            image: 'tfcollins/libiio_debian_bullseye-ci:latest'
-            os_type: default
-            ext: deb
-          - name: 'Linux-Debian-12'
-            image: 'tfcollins/libiio_debian_bookworm-ci:latest'
-            os_type: default
-            ext: deb
-          - name: 'Linux-CentOS-7'
-            image: 'tfcollins/libiio_centos_7-ci:latest'
-            os_type: centos
-            ext: rpm
-          - name: 'Linux-Fedora-28'
-            image: 'tfcollins/libiio_fedora_28-ci:latest'
-            os_type: centos
-            ext: rpm
-          - name: 'Linux-Fedora-34'
-            image: 'tfcollins/libiio_fedora_34-ci:latest'
-            os_type: centos
-            ext: rpm
-          - name: 'Linux-openSUSE-15.4'
-            image: 'tfcollins/libiio_opensuse_15_4-ci:latest'
-            os_type: opensuse
-            ext: rpm
+          - image: ubuntu:22.04
+            artifact-name: Linux-Ubuntu-22.04
+            build-script: ci-linux.sh
+            os-type: default
+            package-type: deb
+          - image: ubuntu:24.04
+            artifact-name: Linux-Ubuntu-24.04
+            build-script: ci-linux.sh
+            os-type: default
+            package-type: deb
+          - image: ubuntu:26.04
+            artifact-name: Linux-Ubuntu-26.04
+            build-script: ci-linux.sh
+            os-type: default
+            package-type: deb
+          - image: debian:bookworm
+            artifact-name: Linux-Debian-12
+            build-script: ci-linux.sh
+            os-type: default
+            package-type: deb
+          - image: debian:trixie
+            artifact-name: Linux-Debian-13
+            build-script: ci-linux.sh
+            os-type: default
+            package-type: deb
+          - image: fedora:42
+            artifact-name:  Linux-Fedora-42
+            build-script: ci-linux.sh
+            os-type: fedora
+            package-type: rpm
+
+          - image: fedora:44
+            artifact-name:  Linux-Fedora-44
+            build-script: ci-linux.sh
+            os-type: fedora
+            package-type: rpm
+          - image: opensuse/leap:15.6
+            artifact-name: Linux-openSUSE-15.6
+            build-script: ci-linux.sh
+            os-type: opensuse
+            package-type: rpm
+
+          - image: opensuse/leap:16.0
+            artifact-name: Linux-openSUSE-16.0
+            build-script: ci-linux.sh
+            os-type: opensuse
+            package-type: rpm
+    defaults:
+      run:
+        shell: /bin/bash {0}
+    container:
+      image: ${{ matrix.image }}
+      env:
+        PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     steps:
+      - name: Install dependencies
+        run: |
+          set -e
+
+          # Ubuntu / Debian
+          if command -v apt-get &>/dev/null; then
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get install -y build-essential git cmake libxml2-dev bison flex \
+              libcdk5-dev libaio-dev libusb-1.0-0-dev \
+              libserialport-dev libavahi-client-dev doxygen graphviz man2html \
+              python3 python3-pip python3-setuptools curl wget sudo tar
+            pip3 install sphinx --break-system-packages 2>/dev/null || pip3 install sphinx
+
+          # Fedora
+          elif command -v dnf &>/dev/null; then
+            dnf install -y cmake gcc gcc-c++ git flex bison libxml2-devel \
+              libaio-devel libusb1-devel avahi-devel \
+              libserialport-devel rpm-build doxygen graphviz \
+              python3-pip python3-setuptools curl wget sudo tar
+            pip3 install sphinx --break-system-packages 2>/dev/null || pip3 install sphinx
+
+          # openSUSE
+          elif command -v zypper &>/dev/null; then           
+            zypper --gpg-auto-import-keys ref
+            zypper in -y --allow-downgrade gcc-c++ make cmake git libxml2-devel bison flex cdk-devel \
+              libaio-devel libusb-1_0-devel \
+              libserialport-devel libavahi-devel avahi rpm-build doxygen graphviz \
+              python3 python3-pip python3-setuptools sudo wget curl tar
+            pip3 install sphinx --break-system-packages 2>/dev/null || pip3 install sphinx
+          fi
       - name: Checkout
         uses: actions/checkout@v7
         with:
@@ -93,7 +140,7 @@ jobs:
           sudo docker run --rm -t --privileged \
             -e ARTIFACTNAME='${{ matrix.name }}' \
             -v "$PWD":"/ci" "${{ matrix.image }}" \
-            /bin/bash -c "cd /ci/ && chmod +x ./CI/travis/ci-linux.sh && ./CI/travis/ci-linux.sh ${{ matrix.os_type }} /ci/build/*.${{ matrix.ext }}"
+            /bin/bash -c "cd /ci/ && chmod +x ./CI/travis/ci-linux.sh && ./CI/travis/ci-linux.sh ${{ matrix.os-type }} /ci/build/*.${{ matrix.ext }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
