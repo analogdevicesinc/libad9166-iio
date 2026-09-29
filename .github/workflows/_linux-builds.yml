@@ -132,7 +132,7 @@ jobs:
             --method get_artifacts_from_location \
             --repo external \
             --package_version "${{ inputs.libiio-version }}" \
-            --package_name "${{ matrix.artifact-name }}.${{ matrix.package_type }}"
+            --package_name "${{ matrix.artifact-name }}.${{ matrix.package-type }}"
 
       - name: Build
         run: |
@@ -153,16 +153,7 @@ jobs:
         with:
           name: ${{ matrix.artifact-name }}
           path: |
-            build/*9166*.${{matrix.package_type}}
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: ${{ matrix.name }}
-          path: |
-            build/*.deb
-            build/*.rpm
-          if-no-files-found: error
+            build/*9166*.${{ matrix.package-type }}
 
       - name: Install wheel and twine
         if: matrix.name == 'Linux-Ubuntu-20.04'
