@@ -64,34 +64,32 @@ jobs:
     needs: setup
     uses: ./.github/workflows/_linux-builds.yml
     with:
-      build_ref: ${{ needs.setup.outputs.build_ref }}
-      libiio_version: ${{ needs.setup.outputs.libiio_version }}
-      is_main: ${{ needs.setup.outputs.is_main == 'true' }}
-      is_release_tag: ${{ needs.setup.outputs.is_release_tag == 'true' }}
+      build-type: ${{ needs.setup.outputs.build-type }}
+      libiio-version: ${{ needs.setup.outputs.libiio-version }}
     secrets: inherit
 
   arm:
     needs: setup
     uses: ./.github/workflows/_arm-builds.yml
     with:
-      build_ref: ${{ needs.setup.outputs.build_ref }}
-      libiio_version: ${{ needs.setup.outputs.libiio_version }}
+      build-type: ${{ needs.setup.outputs.build-type }}
+      libiio-version: ${{ needs.setup.outputs.libiio-version }}
     secrets: inherit
 
   macos:
     needs: setup
     uses: ./.github/workflows/_macos-builds.yml
     with:
-      build_ref: ${{ needs.setup.outputs.build_ref }}
-      libiio_version: ${{ needs.setup.outputs.libiio_version }}
+      build-type: ${{ needs.setup.outputs.build-type }}
+      libiio-version: ${{ needs.setup.outputs.libiio-version }}
     secrets: inherit
 
   windows:
     needs: setup
     uses: ./.github/workflows/_windows-builds.yml
     with:
-      build_ref: ${{ needs.setup.outputs.build_ref }}
-      libiio_version: ${{ needs.setup.outputs.libiio_version }}
+      build-type: ${{ needs.setup.outputs.build-type }}
+      libiio-version: ${{ needs.setup.outputs.libiio-version }}
     secrets: inherit
 
   deploy:

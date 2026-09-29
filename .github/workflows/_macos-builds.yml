@@ -3,10 +3,10 @@ name: macOS builds
 on:
   workflow_call:
     inputs:
-      build_ref:
+      build-type:
         required: true
         type: string
-      libiio_version:
+      libiio-version:
         required: true
         type: string
 
@@ -24,7 +24,6 @@ jobs:
       - name: Checkout code repository
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.build_ref }}
           fetch-depth: 1
 
       - name: Install uv
@@ -49,7 +48,7 @@ jobs:
           $PYTHON /tmp/cloudsmith_helper.py \
             --method get_artifacts_from_location \
             --repo external \
-            --package_version "${{ inputs.libiio_version }}" \
+            --package_version "${{ inputs.libiio-version }}" \
             --package_name "macOS-13-arm64.pkg"
           ls -la .
 

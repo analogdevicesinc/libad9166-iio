@@ -3,10 +3,10 @@ name: Windows builds
 on:
   workflow_call:
     inputs:
-      build_ref:
+      build-type:
         required: true
         type: string
-      libiio_version:
+      libiio-version:
         required: true
         type: string
 
@@ -26,7 +26,6 @@ jobs:
       - name: Checkout code repository
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.build_ref }}
           fetch-depth: 1
 
       - name: Create artifact staging directory
@@ -61,7 +60,7 @@ jobs:
           & $env:PYTHON "$env:RUNNER_TEMP\cloudsmith_helper.py" `
             --method get_artifacts_from_location `
             --repo external `
-            --package_version "${{ inputs.libiio_version }}" `
+            --package_version "${{ inputs.libiio-version }}" `
             --package_name "Windows.zip"
           Pop-Location
           Expand-Archive -Force libiio_pkg\Windows.zip -DestinationPath libiio_pkg\extracted
@@ -120,7 +119,6 @@ jobs:
       - name: Checkout code repository
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.build_ref }}
           fetch-depth: 1
 
       - name: Download all build artifacts

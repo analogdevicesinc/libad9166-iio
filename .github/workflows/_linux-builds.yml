@@ -3,20 +3,12 @@ name: Linux builds
 on:
   workflow_call:
     inputs:
-      build_ref:
+      build-type:
         required: true
         type: string
-      libiio_version:
+      libiio-version:
         required: true
         type: string
-      is_main:
-        required: false
-        type: boolean
-        default: false
-      is_release_tag:
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -92,7 +84,7 @@ jobs:
           $PYTHON /tmp/cloudsmith_helper.py \
             --method get_artifacts_from_location \
             --repo external \
-            --package_version "${{ inputs.libiio_version }}" \
+            --package_version "${{ inputs.libiio-version }}" \
             --package_name "${{ matrix.name }}.${{ matrix.ext }}"
 
       - name: Build
