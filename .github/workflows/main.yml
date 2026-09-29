@@ -93,6 +93,44 @@ jobs:
     secrets: inherit
 
   #############################################
+  # Python sdist/wheel
+  #############################################
+  build-pypi:
+    if: needs.setup.outputs.is-v0 == 'true' || needs.setup.outputs.is-release == 'true'
+    needs: [setup]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+      - name: Get libiio from Cloudsmith
+        env:
+          CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
+        run: |
+          set -e
+          python3 -m pip install requests
+          wget https://raw.githubusercontent.com/analogdevicesinc/wiki-scripts/refs/heads/main/utils/cloudsmith_utils/cloudsmith_helper.py \
+            -O /tmp/cloudsmith_helper.py
+          UBUNTU_VER=$(lsb_release -rs)
+          mkdir -p /tmp/libiio && cd /tmp/libiio
+          python3 /tmp/cloudsmith_helper.py \
+            --method get_artifacts_from_location \
+            --repo external \
+            --package_version "${{ needs.setup.outputs.libiio-version }}" \
+            --package_name "Linux-Ubuntu-${UBUNTU_VER}.deb"
+          sudo dpkg -i libiio-*.deb || sudo apt-get install -f -y
+          sudo ldconfig
+
+      - uses: analogdevicesinc/shared-actions/pypi-build@main
+        with:
+          cmake-options: '-DPYTHON_BINDINGS=ON -DENABLE_PACKAGING=ON -DDEB_DETECT_DEPENDENCIES=ON'
+          apt-packages: 'cmake libxml2-dev libusb-1.0-0-dev'
+          run-tests: 'true'
+          pytest-args: '-vs --skip-scan'
+          artifact-name: libad9166-dist
+
+  #############################################
   # Check Artifacts
   #############################################
   check-artifacts:
@@ -200,7 +238,6 @@ jobs:
   #############################################
   # Push to GitHub Release
   #############################################
-
   push-github-release:
     if: needs.setup.outputs.is-release == 'true'
     needs: [setup, check-artifacts]
@@ -228,3 +265,22 @@ jobs:
           name: "libad9166 release ${{ github.ref_name }}"
           files: ${{ github.workspace }}/artifacts/*
           generate_release_notes: true
+
+  #############################################
+  # Publish to PyPI (manual approval)
+  #############################################
+  push-pypi:
+    if: needs.setup.outputs.is-release == 'true'
+    needs: [setup, build-pypi, push-github-release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: pypi
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: libad9166-dist
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist/

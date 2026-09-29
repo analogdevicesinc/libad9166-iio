@@ -41,9 +41,3 @@ cmake $CMAKE_OPTIONS
 sudo make && sudo make package && make test
 sudo make install
 ldconfig
-cd ..
-cd bindings/python
-pip install -r requirements_dev.txt
-export LD_LIBRARY_PATH=/usr/local/lib/
-python3 -m pip install pytest
-python3 -m pytest -vs --skip-scan

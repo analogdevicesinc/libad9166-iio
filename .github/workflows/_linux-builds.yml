@@ -154,34 +154,3 @@ jobs:
           name: ${{ matrix.artifact-name }}
           path: |
             build/*9166*.${{ matrix.package-type }}
-
-      - name: Install wheel and twine
-        if: matrix.name == 'Linux-Ubuntu-20.04'
-        run: |
-          sudo pip install setuptools wheel twine build
-          cd build/bindings/python
-          sudo python setup.py bdist_wheel
-
-      - name: Deploy python package (PyPI, on tag)
-        if: ${{ matrix.name == 'Linux-Ubuntu-20.04' && inputs.is_release_tag }}
-        env:
-          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-        run: |
-          cd build/bindings/python
-          python -m twine upload dist/*.whl
-
-      - name: Update to dev version and deploy (Test PyPI, on main)
-        if: ${{ matrix.name == 'Linux-Ubuntu-20.04' && inputs.is_main }}
-        env:
-          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
-        run: |
-          cd build/bindings/python
-          sudo rm -f ./dist/*.whl
-          sudo pip3 install --upgrade requests
-          sudo pip install invoke
-          sudo invoke bumpversion-test
-          sudo python -m build
-          ls -al
-          python -m twine upload --repository-url https://test.pypi.org/legacy/ --skip-existing dist/*.whl
