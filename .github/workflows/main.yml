@@ -28,66 +28,37 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     outputs:
-      build_ref: ${{ steps.vars.outputs.build_ref }}
-      source_branch_name: ${{ steps.vars.outputs.source_branch_name }}
-      libiio_version: ${{ steps.vars.outputs.libiio_version }}
-      is_main: ${{ steps.vars.outputs.is_main }}
-      is_release_tag: ${{ steps.vars.outputs.is_release_tag }}
-      do_deploy: ${{ steps.vars.outputs.do_deploy }}
-    env:
-      GH_TOKEN: ${{ github.token }}
+      build-type: ${{ steps.set.outputs.build-type }}
+      libiio-version: ${{steps.set.outputs.libiio-version }}
+      is-v0: ${{ steps.set.outputs.is-v0 }}
+      is-release: ${{ steps.set.outputs.is-release }}
+      cloudsmith-version: ${{ steps.set.outputs.cloudsmith-version }}
     steps:
-      - name: Compute build ref and libiio version
-        id: vars
+      - id: set
+        shell: bash
         run: |
-          set -e
-          event='${{ github.event_name }}'
-          ref='${{ github.ref }}'
-          ref_name='${{ github.ref_name }}'
-          target='${{ github.base_ref }}'   # PR target branch (empty otherwise)
-
-          # Azure's monthly schedule targeted libad9166-iio-v0; GitHub
-          # schedules run on the default branch, so force the ref here.
-          if [ "$event" = "schedule" ]; then
-            build_ref='refs/heads/libad9166-iio-v0'
-            ref_name='libad9166-iio-v0'
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "build-type=Release" >> "${GITHUB_OUTPUT}"
+            echo "is-release=true" >> "${GITHUB_OUTPUT}"
+            echo "cloudsmith-version=${GITHUB_REF#refs/tags/}" >> "${GITHUB_OUTPUT}"
+            echo "libiio-version=libiio-v0~latest" >> "${GITHUB_OUTPUT}"
           else
-            build_ref="$ref"
+            echo "build-type=RelWithDebInfo" >> "${GITHUB_OUTPUT}"
+            echo "is-release=false" >> "${GITHUB_OUTPUT}"
+            echo "libiio-version=libiio-v0~latest" >> "${GITHUB_OUTPUT}"
           fi
-
-          # Select the libiio release. Preserves the Azure downloadBranch
-          # intent: the v0 line pairs with libiio v0, everything else with
-          # the latest libiio release. Overridable via env.LIBIIO_VERSION.
-          version='${{ env.LIBIIO_VERSION }}'
-          if [ -z "$version" ]; then
-            if [ "$ref_name" = "libad9166-iio-v0" ] || [ "$target" = "libad9166-iio-v0" ]; then
-              version='v0.26'
-            else
-              version="$(gh release view --repo analogdevicesinc/libiio --json tagName --jq .tagName)"
-            fi
+          if [[ "${GITHUB_REF}" == "refs/heads/libad9166-iio-v0" ]]; then
+            echo "is-v0=true" >> "${GITHUB_OUTPUT}"
+            echo "cloudsmith-version=libad9166-iio-v0~latest" >> "${GITHUB_OUTPUT}"
+            echo "libiio-version=libiio-v0~latest" >> "${GITHUB_OUTPUT}"
+          elif [[ "${GITHUB_REF}" == refs/heads/staging/* ]]; then
+            echo "is-v0=false" >> "${GITHUB_OUTPUT}"
+            echo "cloudsmith-version=test-v0" >> "${GITHUB_OUTPUT}"
+            echo "libiio-version=libiio-v0~latest" >> "${GITHUB_OUTPUT}"
+          else
+            echo "is-v0=false" >> "${GITHUB_OUTPUT}"
+            echo "libiio-version=libiio-v0~latest" >> "${GITHUB_OUTPUT}"
           fi
-
-          is_main=false
-          [ "$ref" = "refs/heads/main" ] && is_main=true
-
-          is_release_tag=false
-          case "$ref" in refs/tags/v*) is_release_tag=true ;; esac
-
-          # Deploy to SWDownloads only on main or libad9166-iio-v0.
-          do_deploy=false
-          if [ "$is_main" = "true" ] || [ "$ref_name" = "libad9166-iio-v0" ]; then
-            do_deploy=true
-          fi
-
-          {
-            echo "build_ref=$build_ref"
-            echo "source_branch_name=$ref_name"
-            echo "libiio_version=$version"
-            echo "is_main=$is_main"
-            echo "is_release_tag=$is_release_tag"
-            echo "do_deploy=$do_deploy"
-          } >> "$GITHUB_OUTPUT"
-          cat "$GITHUB_OUTPUT"
 
   linux:
     needs: setup
