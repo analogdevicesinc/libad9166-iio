@@ -55,4 +55,4 @@ Source: "{#ARTIFACTS_DIR}\libxml2.dll"; DestDir: "{sys}"; Check: Is64BitInstallM
 Source: "{#ARTIFACTS_DIR}\libusb-1.0.dll"; DestDir: "{sys}"; Check: Is64BitInstallMode; Flags: onlyifdoesntexist
 Source: "{#ARTIFACTS_DIR}\libserialport-0.dll"; DestDir: "{sys}"; Check: Is64BitInstallMode; Flags: onlyifdoesntexist
 Source: "{#VCREDIST_DIR}\msvcp140.dll"; DestDir: "{sys}"; Check: Is64BitInstallMode; Flags: onlyifdoesntexist
-Source: "{#VCREDIST_DIR}\vcruntime140.dll"; DestDir: "{sys}"; Check: Is64BitInstallMode; Flags: onlyifdoesntexis
+Source: "{#VCREDIST_DIR}\vcruntime140.dll"; DestDir: "{sys}"; Check: Is64BitInstallMode; Flags: onlyifdoesntexist
