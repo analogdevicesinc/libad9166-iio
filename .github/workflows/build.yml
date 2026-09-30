@@ -53,7 +53,6 @@ jobs:
             echo "libiio-version=libiio-v0~latest" >> "${GITHUB_OUTPUT}"
           elif [[ "${GITHUB_REF}" == refs/heads/staging/* ]]; then
             echo "is-v0=false" >> "${GITHUB_OUTPUT}"
-            echo "cloudsmith-version=test-v0" >> "${GITHUB_OUTPUT}"
             echo "libiio-version=libiio-v0~latest" >> "${GITHUB_OUTPUT}"
           else
             echo "is-v0=false" >> "${GITHUB_OUTPUT}"
@@ -254,7 +253,7 @@ jobs:
           path: ${{ github.workspace }}/artifacts
 
       - name: Prepare assets for release
-        run: ./CI/azure/prepare_assets.sh release
+        run: ./CI/prepare_assets.sh release
         env:
           BUILD_SOURCESDIRECTORY: ${{ github.workspace }}
           BUILD_ARTIFACTSTAGINGDIRECTORY: ${{ github.workspace }}/artifacts
