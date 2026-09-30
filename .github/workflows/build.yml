@@ -204,6 +204,7 @@ jobs:
           for dir in "${ARTIFACTS}"/*/; do
             tag=$(basename "${dir}")
             [[ "${tag}" == "Artifact manifest" ]] && continue
+            [[ "${tag}" == libad9166-libiio-upstream-* ]] && continue
             if [[ "${tag}" == Windows-* ]]; then
               cd "${ARTIFACTS}"
               zip -r "${tag}.zip" "${tag}"
