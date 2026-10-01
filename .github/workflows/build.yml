@@ -35,26 +35,20 @@ jobs:
       - id: set
         shell: bash
         run: |
+          echo "libiio-version=libiio-v0~latest" >> "${GITHUB_OUTPUT}"
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             echo "build-type=Release" >> "${GITHUB_OUTPUT}"
             echo "is-release=true" >> "${GITHUB_OUTPUT}"
             echo "cloudsmith-version=libad9166-iio-${GITHUB_REF#refs/tags/}" >> "${GITHUB_OUTPUT}"
-            echo "libiio-version=libiio-v0~latest" >> "${GITHUB_OUTPUT}"
           else
             echo "build-type=RelWithDebInfo" >> "${GITHUB_OUTPUT}"
             echo "is-release=false" >> "${GITHUB_OUTPUT}"
-            echo "libiio-version=libiio-v0~latest" >> "${GITHUB_OUTPUT}"
           fi
           if [[ "${GITHUB_REF}" == "refs/heads/libad9166-iio-v0" ]]; then
             echo "is-v0=true" >> "${GITHUB_OUTPUT}"
             echo "cloudsmith-version=libad9166-iio-v0~latest" >> "${GITHUB_OUTPUT}"
-            echo "libiio-version=libiio-v0~latest" >> "${GITHUB_OUTPUT}"
-          elif [[ "${GITHUB_REF}" == refs/heads/staging/* ]]; then
-            echo "is-v0=false" >> "${GITHUB_OUTPUT}"
-            echo "libiio-version=libiio-v0~latest" >> "${GITHUB_OUTPUT}"
           else
             echo "is-v0=false" >> "${GITHUB_OUTPUT}"
-            echo "libiio-version=libiio-v0~latest" >> "${GITHUB_OUTPUT}"
           fi
 
   linux:
