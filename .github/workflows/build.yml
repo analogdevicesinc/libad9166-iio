@@ -18,6 +18,10 @@ on:
       - next_stable
       - libad9166-iio-v0
       - '20*'
+  concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
+
   schedule:
     - cron: '0 0 1 * *'
 
