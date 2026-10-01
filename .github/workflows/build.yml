@@ -243,6 +243,8 @@ jobs:
     needs: [setup, check-artifacts]
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
         with:
