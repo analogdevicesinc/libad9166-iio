@@ -277,6 +277,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: pypi
+    permissions:
+      id-token: write
     steps:
       - uses: actions/download-artifact@v8
         with:
