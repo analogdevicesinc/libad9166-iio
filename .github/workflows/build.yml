@@ -22,9 +22,6 @@ on:
     group: ${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: true
 
-env:
-  LIBIIO_VERSION: ''
-
 jobs:
   setup:
     runs-on: ubuntu-latest
