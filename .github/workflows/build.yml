@@ -22,9 +22,6 @@ on:
     group: ${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: true
 
-  schedule:
-    - cron: '0 0 1 * *'
-
 env:
   LIBIIO_VERSION: ''
 
@@ -206,7 +203,7 @@ jobs:
           ARTIFACTS="${{ github.workspace }}/artifacts"
           for dir in "${ARTIFACTS}"/*/; do
             tag=$(basename "${dir}")
-            [[ "${tag}" == "Artifact manifest" ]] && continue
+            [[ "${tag}" == "Artifact-manifest" ]] && continue
             [[ "${tag}" == libad9166-libiio-upstream-* ]] && continue
             if [[ "${tag}" == Windows-* ]]; then
               cd "${ARTIFACTS}"
