@@ -17,7 +17,8 @@ echo "$PWD"
 
 mkdir -p build
 cd build
-cmake -DPYTHON_BINDINGS=ON -DENABLE_PACKAGING=ON -DDEB_DETECT_DEPENDENCIES=ON -DWITH_DOC=OFF ..
+cmake -DPYTHON_BINDINGS=ON -DENABLE_PACKAGING=ON -DDEB_DETECT_DEPENDENCIES=ON -DWITH_DOC=OFF \
+	-DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}" ..
 make && make package && make test
 make install
 ldconfig
