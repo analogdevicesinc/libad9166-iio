@@ -80,7 +80,6 @@ jobs:
     needs: setup
     uses: ./.github/workflows/_windows-builds.yml
     with:
-      build-type: ${{ needs.setup.outputs.build-type }}
       libiio-version: ${{ needs.setup.outputs.libiio-version }}
     secrets: inherit
 
