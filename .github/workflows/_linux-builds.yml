@@ -9,12 +9,16 @@ on:
       libiio-version:
         required: true
         type: string
+    secrets:
+      CLOUDSMITH_API_KEY:
+        required: true
 jobs:
   linux:
-    name: ${{ matrix.artifact-name }}                   
+    name: ${{ matrix.artifact-name }}
     runs-on: ubuntu-latest
     env:
-      PYTHON: ${{ github.workspace }}/.venv/bin/python3
+      CMAKE_BUILD_TYPE: ${{ inputs.build-type }}
+      ARTIFACTNAME: ${{ matrix.artifact-name }}
     timeout-minutes: 15
     strategy:
       fail-fast: false
@@ -50,7 +54,6 @@ jobs:
             build-script: ci-linux.sh
             os-type: fedora
             package-type: rpm
-
           - image: fedora:44
             artifact-name:  Linux-Fedora-44
             build-script: ci-linux.sh
@@ -61,7 +64,6 @@ jobs:
             build-script: ci-linux.sh
             os-type: opensuse
             package-type: rpm
-
           - image: opensuse/leap:16.0
             artifact-name: Linux-openSUSE-16.0
             build-script: ci-linux.sh
@@ -85,33 +87,30 @@ jobs:
             apt-get update
             apt-get install -y build-essential git cmake libxml2-dev bison flex \
               libcdk5-dev libaio-dev libusb-1.0-0-dev \
-              libserialport-dev libavahi-client-dev doxygen graphviz man2html \
+              libserialport-dev libavahi-client-dev \
               python3 python3-pip python3-setuptools curl wget sudo tar
-            pip3 install sphinx --break-system-packages 2>/dev/null || pip3 install sphinx
 
           # Fedora
           elif command -v dnf &>/dev/null; then
             dnf install -y cmake gcc gcc-c++ git flex bison libxml2-devel \
               libaio-devel libusb1-devel avahi-devel \
-              libserialport-devel rpm-build doxygen graphviz \
+              libserialport-devel rpm-build \
               python3-pip python3-setuptools curl wget sudo tar
-            pip3 install sphinx --break-system-packages 2>/dev/null || pip3 install sphinx
 
           # openSUSE
-          elif command -v zypper &>/dev/null; then           
+          elif command -v zypper &>/dev/null; then
             zypper --gpg-auto-import-keys ref
             zypper in -y --allow-downgrade gcc-c++ make cmake git libxml2-devel bison flex cdk-devel \
               libaio-devel libusb-1_0-devel \
-              libserialport-devel libavahi-devel avahi rpm-build doxygen graphviz \
+              libserialport-devel libavahi-devel avahi rpm-build \
               python3 python3-pip python3-setuptools sudo wget curl tar
-            pip3 install sphinx --break-system-packages 2>/dev/null || pip3 install sphinx
           fi
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.2.0
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
       - name: Install py11, create venv and install dependencies
         run: |
           set -e
@@ -121,18 +120,12 @@ jobs:
           uv pip install requests
 
       - name: Get libiio from Cloudsmith
-        env:
-          CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
-        run: |
-          set -e
-          wget https://raw.githubusercontent.com/analogdevicesinc/wiki-scripts/refs/heads/main/utils/cloudsmith_utils/cloudsmith_helper.py \
-            -O /tmp/cloudsmith_helper.py
-          mkdir -p build && cd build
-          $PYTHON /tmp/cloudsmith_helper.py \
-            --method get_artifacts_from_location \
-            --repo external \
-            --package_version "${{ inputs.libiio-version }}" \
-            --package_name "${{ matrix.artifact-name }}.${{ matrix.package-type }}"
+        uses: ./.github/actions/get-libiio
+        with:
+          cloudsmith-api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
+          package-name: ${{ matrix.artifact-name }}.${{ matrix.package-type }}
+          package-version: ${{ inputs.libiio-version }}
+          python: $GITHUB_WORKSPACE/.venv/bin/python3
 
       - name: Build
         run: |
@@ -149,39 +142,58 @@ jobs:
           ./CI/travis/${{ matrix.build-script }} "${{ matrix.os-type }}" "$LIBIIO_PKG"
       - name: Upload build artifacts
         if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.artifact-name }}
           path: |
             build/*9166*.${{ matrix.package-type }}
+          if-no-files-found: error
+  linux-upstream:
+    name: upstream-ubuntu-amd64
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      APP_NAME: libad9166
+      ARTIFACT_NAME: libad9166-libiio-upstream
+    defaults:
+      run:
+        working-directory: ${{ env.APP_NAME }}
+    steps:
+      - name: Checkout code repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          path: ${{ env.APP_NAME }}
 
-      - name: Install wheel and twine
-        if: matrix.name == 'Linux-Ubuntu-20.04'
+      - name: Identify version
+        id: set_version
         run: |
-          sudo pip install setuptools wheel twine build
-          cd build/bindings/python
-          sudo python setup.py bdist_wheel
+          # Extract version from CMakeLists.txt project() line
+          cmake_version=$(grep -oP 'project\s*\([^)]*VERSION\s+\K[0-9]+\.[0-9]+(\.[0-9]+)?' CMakeLists.txt)
+          if [[ -z "$cmake_version" ]]; then
+            echo "Failed to extract version from CMakeLists.txt, using default"
+            cmake_version="0.0.1+${{ github.sha }}"
+          fi
+          echo "Version to use: $cmake_version"
+          echo "version=$cmake_version" >> "$GITHUB_OUTPUT"
 
-      - name: Deploy python package (PyPI, on tag)
-        if: ${{ matrix.name == 'Linux-Ubuntu-20.04' && inputs.is_release_tag }}
-        env:
-          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      - name: Create .deb package
         run: |
-          cd build/bindings/python
-          python -m twine upload dist/*.whl
+          .github/scripts/create_debian.sh ${{ steps.set_version.outputs.version }}
 
-      - name: Update to dev version and deploy (Test PyPI, on main)
-        if: ${{ matrix.name == 'Linux-Ubuntu-20.04' && inputs.is_main }}
-        env:
-          TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
-          TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
+      - name: Copy debian artifacts
         run: |
-          cd build/bindings/python
-          sudo rm -f ./dist/*.whl
-          sudo pip3 install --upgrade requests
-          sudo pip install invoke
-          sudo invoke bumpversion-test
-          sudo python -m build
-          ls -al
-          python -m twine upload --repository-url https://test.pypi.org/legacy/ --skip-existing dist/*.whl
+          mkdir -p artifacts
+          cp ../*.deb ../*.dsc ../*.debian.tar.xz ../*.orig.tar.gz artifacts/
+          ls -la artifacts/
+
+      - name: Upload debian artifacts to github
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ env.ARTIFACT_NAME }}-ubuntu
+          path: |
+            ${{ env.APP_NAME }}/artifacts/*.deb
+            ${{ env.APP_NAME }}/artifacts/*.dsc
+            ${{ env.APP_NAME }}/artifacts/*.debian.tar.xz
+            ${{ env.APP_NAME }}/artifacts/*.orig.tar.gz
+          if-no-files-found: error
