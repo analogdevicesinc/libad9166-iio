@@ -2,8 +2,11 @@
 $ErrorActionPreference = "Stop"
 $ErrorView = "NormalView"
 
-dir $env:BUILD_ARTIFACTSTAGINGDIRECTORY\Windows-VS-2022-x64
-iscc "/DSOURCE_DIR=$pwd" $env:BUILD_ARTIFACTSTAGINGDIRECTORY\Windows-VS-2022-x64\libad9166-iio.iss
+$artifactsDir = "$env:BUILD_ARTIFACTSTAGINGDIRECTORY\Windows-VS-2022-x64"
+dir $artifactsDir
+# The .iss resolves its [Files] sources from ARTIFACTS_DIR / VCREDIST_DIR; both the
+# libad9166/libiio DLLs and the VC runtime DLLs are staged into this one directory.
+iscc "/DARTIFACTS_DIR=$artifactsDir" "/DVCREDIST_DIR=$artifactsDir" "$artifactsDir\libad9166-iio.iss"
 
 Get-ChildItem $env:BUILD_ARTIFACTSTAGINGDIRECTORY -Force -Recurse | Remove-Item -Force -Recurse
 cp C:\libad9166-setup.exe $env:BUILD_ARTIFACTSTAGINGDIRECTORY
