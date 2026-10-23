@@ -1,14 +1,18 @@
 ## :warning: Important note
 
-Currently the main branch of this repository does not support the new v1.0 API of [libiio](https://github.com/analogdevicesinc/libiio).
+The main branch of this repository now depends on [libiio](https://github.com/analogdevicesinc/libiio) v1.0.0, which features a brand new API that is incompatible with libiio v0.26 and older.
 
-If you want to build libad9166-iio please use the [libad9166-iio-v0](https://github.com/analogdevicesinc/libad9166-iio/tree/libad9166-iio-v0) branch that supports the old v0.x API, that can be found on the [libiio-v0](https://github.com/analogdevicesinc/libiio/tree/libiio-v0) branch or as packages on the release section of the libiio repository.
+If you need to build libad9166-iio against the old v0.x API of libiio, please use the [libad9166-iio-v0](https://github.com/analogdevicesinc/libad9166-iio/tree/libad9166-iio-v0) branch, which will continue to exist and receive bug fixes, though it will not receive new features. The corresponding v0.x API of libiio can be found on the [libiio-v0](https://github.com/analogdevicesinc/libiio/tree/libiio-v0) branch, or as packages on the release section of the libiio repository.
 
 # libad9166-iio
 
 This is a simple library used for userspace,
  - which applies calibration gain and offset for a user-given frequency
- 
+
+**Dependencies**
+
+ - [libiio IIO interface library (Version 1.0.0 or greater)](https://github.com/analogdevicesinc/libiio)
+
 **Docs**
 
 Doxygen-based documentation is available at: http://analogdevicesinc.github.io/libad9166-iio/
