@@ -9,6 +9,9 @@ on:
       libiio-version:
         required: true
         type: string
+    secrets:
+      CLOUDSMITH_API_KEY:
+        required: true
 
 jobs:
   arm-native:
@@ -40,42 +43,35 @@ jobs:
             platform-flag: '--platform linux/arm/v7'
             artifact-name: Debian-12-armhf
 
-          - image: debian:trixie
+          - image: docker.cloudsmith.io/adi/containers/kuiper_basic_64@sha256:2a4b203ca34cf660339f8d8a5b32d290ae3c4918e18c0473902e2c12c86ca129
             platform-flag: ''
             artifact-name: Debian-13-arm64
-          - image: arm32v7/debian:trixie
+          - image: docker.cloudsmith.io/adi/containers/kuiper_basic_32@sha256:ce9c5eba9dc120595e42142665aa11ded7317181c01c14c190e86835cfef9c8a
             platform-flag: '--platform linux/arm/v7'
             artifact-name: Debian-13-armhf
     env:
       ARTIFACTNAME: ${{ matrix.artifact-name }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.2.0
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
 
       - name: Setup Python venv and install dependencies
         run: |
           set -e
-          uv python install 3.11 
+          uv python install 3.11
           uv venv --python 3.11 /tmp/cloudsmith-venv --seed
-          uv pip install --python /tmp/cloudsmith-venv/bin/python3 requests 
+          uv pip install --python /tmp/cloudsmith-venv/bin/python3 requests
 
       - name: Get libiio from Cloudsmith
-        env:
-          CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
-          PYTHON: /tmp/cloudsmith-venv/bin/python3
-        run: |
-          set -e
-          wget -q https://raw.githubusercontent.com/analogdevicesinc/wiki-scripts/refs/heads/main/utils/cloudsmith_utils/cloudsmith_helper.py \
-            -O /tmp/cloudsmith_helper.py
-          mkdir -p build && cd build
-          $PYTHON /tmp/cloudsmith_helper.py \
-            --method get_artifacts_from_location \
-            --repo external \
-            --package_version "${{inputs.libiio-version}}" \
-            --package_name "${{ matrix.artifact-name }}.deb"
+        uses: ./.github/actions/get-libiio
+        with:
+          cloudsmith-api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
+          package-name: ${{ matrix.artifact-name }}.deb
+          package-version: ${{ inputs.libiio-version }}
+          python: /tmp/cloudsmith-venv/bin/python3
 
       - name: Build
         run: |
@@ -84,6 +80,7 @@ jobs:
             ${{ matrix.platform-flag }} \
             --rm -t --privileged \
             -e ARTIFACTNAME=${{ matrix.artifact-name }} \
+            -e CMAKE_BUILD_TYPE=${{ inputs.build-type }} \
             -v "${{ github.workspace }}":"/ci" \
             "${{ matrix.image }}" \
             /bin/bash -c "
@@ -96,12 +93,13 @@ jobs:
             "
       - name: Upload artifacts
         if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.artifact-name }}
           path: |
             build/*9166*.deb
             build/*9166*.tar.gz
+          if-no-files-found: error
   arm-native-upstream:
     name: upstream-${{ matrix.distro }}-${{ matrix.architecture }}
     runs-on: ubuntu-24.04-arm
@@ -113,25 +111,27 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - docker_image: arm64v8/debian:trixie
+          - docker_image: docker.cloudsmith.io/adi/containers/kuiper_basic_64@sha256:2a4b203ca34cf660339f8d8a5b32d290ae3c4918e18c0473902e2c12c86ca129
             distro: debian13
             architecture: arm64
             platform-flag: ''
-          - docker_image: arm32v7/debian:trixie
+          - docker_image: docker.cloudsmith.io/adi/containers/kuiper_basic_32@sha256:ce9c5eba9dc120595e42142665aa11ded7317181c01c14c190e86835cfef9c8a
             distro: debian13
             architecture: armhf
             platform-flag: '--platform linux/arm/v7'
     steps:
       - name: Checkout code repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
           path: ${{ env.APP_NAME }}
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+
       - name: Identify version
         id: set_version
         run: |
-          # Extract version from CMakeLists.txt project() line
           cmake_version=$(grep -oP 'project\s*\([^)]*VERSION\s+\K[0-9]+\.[0-9]+(\.[0-9]+)?' "${{ env.APP_NAME }}/CMakeLists.txt")
           if [[ -z "$cmake_version" ]]; then
             echo "Failed to extract version from CMakeLists.txt, using default"
@@ -159,7 +159,7 @@ jobs:
           ls -la ./artifacts/
 
       - name: Upload debian artifacts to github
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ env.ARTIFACT_NAME }}-${{ matrix.distro }}-${{ matrix.architecture }}
           path: |
@@ -192,45 +192,39 @@ jobs:
     env:
       ARTIFACTNAME: ${{ matrix.artifact-name }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v10.2.0
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
 
       - name: Setup Python venv and install dependencies
         run: |
           set -e
-          uv python install 3.11  
+          uv python install 3.11
           uv venv --python 3.11 /tmp/cloudsmith-venv --seed
           uv pip install --python /tmp/cloudsmith-venv/bin/python3 requests
 
       - name: Get libiio from Cloudsmith
-        env:
-          CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
-          PYTHON: /tmp/cloudsmith-venv/bin/python3
-        run: |
-          set -e
-          wget -q https://raw.githubusercontent.com/analogdevicesinc/wiki-scripts/refs/heads/main/utils/cloudsmith_utils/cloudsmith_helper.py \
-            -O /tmp/cloudsmith_helper.py
-          mkdir -p build && cd build
-          $PYTHON /tmp/cloudsmith_helper.py \
-            --method get_artifacts_from_location \
-            --repo external \
-            --package_version "${{inputs.libiio-version}}" \
-            --package_name "${{ matrix.artifact-name }}.deb"
+        uses: ./.github/actions/get-libiio
+        with:
+          cloudsmith-api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
+          package-name: ${{ matrix.artifact-name }}.deb
+          package-version: ${{ inputs.libiio-version }}
+          python: /tmp/cloudsmith-venv/bin/python3
 
       - name: Build
         run: |
           set -e
-          sudo docker run \
+          docker run \
             --platform "linux/${{ matrix.arch }}" \
             --rm -t --privileged \
             -e ARTIFACTNAME=${{ matrix.artifact-name }} \
+            -e CMAKE_BUILD_TYPE=${{ inputs.build-type }} \
             -v "${{ github.workspace }}":"/ci" \
             "${{ matrix.image }}" \
             /bin/bash -c "
@@ -244,9 +238,10 @@ jobs:
 
       - name: Upload artifacts
         if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.artifact-name }}
           path: |
             build/*9166*.deb
             build/*9166*.tar.gz
+          if-no-files-found: error
