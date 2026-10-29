@@ -71,7 +71,7 @@ jobs:
             package-type: rpm
     defaults:
       run:
-        shell: /bin/bash {0}
+        shell: bash
     container:
       image: ${{ matrix.image }}
       env:
@@ -132,7 +132,7 @@ jobs:
           set -e
           source $GITHUB_WORKSPACE/.venv/bin/activate
           chmod +x ./CI/travis/${{ matrix.build-script }}
-          LIBIIO_PKG=$(ls build/libiio-*.${{ matrix.package-type }} 2>/dev/null | head -1)
+          LIBIIO_PKG=$(ls build/libiio-*.${{ matrix.package-type }} 2>/dev/null | head -1) || true
           if [ -z "$LIBIIO_PKG" ]; then
             echo "Error: No libiio package found in build/"
             ls -la build/
@@ -168,13 +168,7 @@ jobs:
       - name: Identify version
         id: set_version
         run: |
-          # Extract version from CMakeLists.txt project() line
           cmake_version=$(grep -oP 'project\s*\([^)]*VERSION\s+\K[0-9]+\.[0-9]+(\.[0-9]+)?' CMakeLists.txt)
-          if [[ -z "$cmake_version" ]]; then
-            echo "Failed to extract version from CMakeLists.txt, using default"
-            cmake_version="0.0.1+${{ github.sha }}"
-          fi
-          echo "Version to use: $cmake_version"
           echo "version=$cmake_version" >> "$GITHUB_OUTPUT"
 
       - name: Create .deb package

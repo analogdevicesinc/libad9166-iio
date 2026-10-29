@@ -27,6 +27,8 @@ jobs:
             artifact-name: macOS-26-arm64
           - os: macos-26-large
             artifact-name: macOS-26-x64
+          - os: xcode-27
+            artifact-name: macOS-27-arm64
     name: ${{ matrix.artifact-name }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
