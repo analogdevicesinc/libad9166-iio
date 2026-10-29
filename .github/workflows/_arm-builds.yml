@@ -133,11 +133,6 @@ jobs:
         id: set_version
         run: |
           cmake_version=$(grep -oP 'project\s*\([^)]*VERSION\s+\K[0-9]+\.[0-9]+(\.[0-9]+)?' "${{ env.APP_NAME }}/CMakeLists.txt")
-          if [[ -z "$cmake_version" ]]; then
-            echo "Failed to extract version from CMakeLists.txt, using default"
-            cmake_version="0.0.1+${{ github.sha }}"
-          fi
-          echo "Version to use: $cmake_version"
           echo "version=$cmake_version" >> "$GITHUB_OUTPUT"
 
       - name: Start persistent container
