@@ -1,0 +1,69 @@
+name: macOS builds
+
+on:
+  workflow_call:
+    inputs:
+      build_ref:
+        required: true
+        type: string
+      libiio_version:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    runs-on: macos-13-xlarge
+    env:
+      PACKAGE_TO_INSTALL: 'build/*.pkg'
+      GH_TOKEN: ${{ github.token }}
+      PYTHON: ${{ github.workspace }}/.venv/bin/python
+    steps:
+      - name: Checkout code repository
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.build_ref }}
+          fetch-depth: 1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.2.0
+
+      - name: Install py11, create venv and install dependencies
+        run: |
+          set -e
+          cd $GITHUB_WORKSPACE
+          uv python install 3.11
+          uv venv --python 3.11 --seed
+          uv pip install requests
+
+      - name: Get libiio from Cloudsmith
+        env:
+          CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
+        run: |
+          set -e
+          curl -sSL https://raw.githubusercontent.com/analogdevicesinc/wiki-scripts/refs/heads/main/utils/cloudsmith_utils/cloudsmith_helper.py \
+            -o /tmp/cloudsmith_helper.py
+          mkdir -p build && cd build
+          $PYTHON /tmp/cloudsmith_helper.py \
+            --method get_artifacts_from_location \
+            --repo external \
+            --package_version "${{ inputs.libiio_version }}" \
+            --package_name "macOS-13-arm64.pkg"
+          ls -la .
+
+      - name: Install dependencies
+        run: ./CI/travis/before_install_darwin
+
+      - name: Build
+        run: ./CI/travis/make_darwin
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: macOS-13-arm64
+          path: |
+            build/*.pkg
+            build_tar/*.pkg
+          if-no-files-found: error
