@@ -3,10 +3,10 @@ name: ARM builds
 on:
   workflow_call:
     inputs:
-      build_ref:
+      build-type:
         required: true
         type: string
-      libiio_version:
+      libiio-version:
         required: true
         type: string
 
@@ -39,7 +39,6 @@ jobs:
       - name: Checkout code repository
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.build_ref }}
           fetch-depth: 1
 
       - name: Install uv
@@ -64,9 +63,9 @@ jobs:
           $PYTHON /tmp/cloudsmith_helper.py \
             --method get_artifacts_from_location \
             --repo external \
-            --package_version "${{ inputs.libiio_version }}" \
+            --package_version "${{ inputs.libiio-version }}" \
             --package_name "${{ matrix.name }}.deb" \
-            || echo "No libiio deb for ${{ matrix.name }} in ${{ inputs.libiio_version }}; ci-ubuntu.sh will install libiio from apt."
+            || echo "No libiio deb for ${{ matrix.name }} in ${{ inputs.libiio-version }}; ci-ubuntu.sh will install libiio from apt."
           ls -la . || true
 
       - name: Setup QEMU
