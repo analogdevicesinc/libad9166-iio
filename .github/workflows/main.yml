@@ -19,82 +19,70 @@ on:
   schedule:
     - cron: '0 0 1 * *'
 
-env:
-  LIBIIO_VERSION: ''
-
 jobs:
   setup:
     runs-on: ubuntu-latest
     outputs:
-      build_ref: ${{ steps.vars.outputs.build_ref }}
-      source_branch_name: ${{ steps.vars.outputs.source_branch_name }}
-      libiio_version: ${{ steps.vars.outputs.libiio_version }}
-      is_main: ${{ steps.vars.outputs.is_main }}
-      is_release_tag: ${{ steps.vars.outputs.is_release_tag }}
+      build-type: ${{ steps.set.outputs.build-type }}
+      libiio-version: ${{ steps.set.outputs.libiio-version }}
+      is-main: ${{ steps.set.outputs.is-main }}
+      is-release: ${{ steps.set.outputs.is-release }}
+      cloudsmith-version: ${{ steps.set.outputs.cloudsmith-version }}
     steps:
-      - name: Compute build ref and libiio version
-        id: vars
+      - id: set
+        shell: bash
         run: |
-          set -e
-          ref='${{ github.ref }}'
-          ref_name='${{ github.ref_name }}'
-
-          build_ref="$ref"
-
-          # Select the libiio release. Preserves the Azure downloadBranch
-          # intent: this branch tracks the libiio v1 line, published to
-          # Cloudsmith from the libiio main branch. Overridable via
-          # env.LIBIIO_VERSION.
-          version='${{ env.LIBIIO_VERSION }}'
-          if [ -z "$version" ]; then
-            version='libiio-main~latest'
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            echo "build-type=Release" >> "${GITHUB_OUTPUT}"
+            echo "is-release=true" >> "${GITHUB_OUTPUT}"
+            echo "cloudsmith-version=${GITHUB_REF#refs/tags/}" >> "${GITHUB_OUTPUT}"
+            echo "libiio-version=libiio-main~latest" >> "${GITHUB_OUTPUT}"
+          else
+            echo "build-type=RelWithDebInfo" >> "${GITHUB_OUTPUT}"
+            echo "is-release=false" >> "${GITHUB_OUTPUT}"
+            echo "libiio-version=libiio-main~latest" >> "${GITHUB_OUTPUT}"
           fi
-
-          is_main=false
-          [ "$ref" = "refs/heads/main" ] && is_main=true
-
-          is_release_tag=false
-          case "$ref" in refs/tags/v*) is_release_tag=true ;; esac
-
-          {
-            echo "build_ref=$build_ref"
-            echo "source_branch_name=$ref_name"
-            echo "libiio_version=$version"
-            echo "is_main=$is_main"
-            echo "is_release_tag=$is_release_tag"
-          } >> "$GITHUB_OUTPUT"
-          cat "$GITHUB_OUTPUT"
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            echo "is-main=true" >> "${GITHUB_OUTPUT}"
+            echo "cloudsmith-version=libad9166-iio-main~latest" >> "${GITHUB_OUTPUT}"
+            echo "libiio-version=libiio-main~latest" >> "${GITHUB_OUTPUT}"
+          elif [[ "${GITHUB_REF}" == refs/heads/staging/* ]]; then
+            echo "is-main=false" >> "${GITHUB_OUTPUT}"
+            echo "cloudsmith-version=test-main" >> "${GITHUB_OUTPUT}"
+            echo "libiio-version=libiio-main~latest" >> "${GITHUB_OUTPUT}"
+          else
+            echo "is-main=false" >> "${GITHUB_OUTPUT}"
+            echo "libiio-version=libiio-main~latest" >> "${GITHUB_OUTPUT}"
+          fi
 
   linux:
     needs: setup
     uses: ./.github/workflows/_linux-builds.yml
     with:
-      build_ref: ${{ needs.setup.outputs.build_ref }}
-      libiio_version: ${{ needs.setup.outputs.libiio_version }}
-      is_main: ${{ needs.setup.outputs.is_main == 'true' }}
-      is_release_tag: ${{ needs.setup.outputs.is_release_tag == 'true' }}
+      build-type: ${{ needs.setup.outputs.build-type }}
+      libiio-version: ${{ needs.setup.outputs.libiio-version }}
     secrets: inherit
 
   arm:
     needs: setup
     uses: ./.github/workflows/_arm-builds.yml
     with:
-      build_ref: ${{ needs.setup.outputs.build_ref }}
-      libiio_version: ${{ needs.setup.outputs.libiio_version }}
+      build-type: ${{ needs.setup.outputs.build-type }}
+      libiio-version: ${{ needs.setup.outputs.libiio-version }}
     secrets: inherit
 
   macos:
     needs: setup
     uses: ./.github/workflows/_macos-builds.yml
     with:
-      build_ref: ${{ needs.setup.outputs.build_ref }}
-      libiio_version: ${{ needs.setup.outputs.libiio_version }}
+      build-type: ${{ needs.setup.outputs.build-type }}
+      libiio-version: ${{ needs.setup.outputs.libiio-version }}
     secrets: inherit
 
   windows:
     needs: setup
     uses: ./.github/workflows/_windows-builds.yml
     with:
-      build_ref: ${{ needs.setup.outputs.build_ref }}
-      libiio_version: ${{ needs.setup.outputs.libiio_version }}
+      build-type: ${{ needs.setup.outputs.build-type }}
+      libiio-version: ${{ needs.setup.outputs.libiio-version }}
     secrets: inherit
