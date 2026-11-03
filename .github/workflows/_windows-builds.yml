@@ -44,27 +44,26 @@ jobs:
           python-version: '3.11'
       - run: pip install requests
       - name: Get libiio from Cloudsmith
-        env:
-          CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
+        uses: ./.github/actions/get-libiio
+        with:
+          cloudsmith-api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
+          package-name: ${{ matrix.artifact-name }}.zip
+          package-version: ${{ inputs.libiio-version }}
+          # setup-python does not provide a python3 shim on Windows
+          python: python
+      - name: Stage libiio for the build
         shell: pwsh
+        working-directory: build
         run: |
           $ErrorActionPreference = "Stop"
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/analogdevicesinc/wiki-scripts/8d7a96779dd034005279ed1c7d052514df695d8c/utils/cloudsmith_utils/cloudsmith_helper.py" `
-            -OutFile "$env:TEMP\cloudsmith_helper.py"
-          if (!(Test-Path build)) { mkdir build }
-          cd build
-          python "$env:TEMP\cloudsmith_helper.py" `
-            --method get_artifacts_from_location `
-            --repo external `
-            --package_version "${{inputs.libiio-version}}" `
-            --package_name "${{ matrix.artifact-name }}.zip"
-          # libiio v1 nests the binaries under a build-type directory and ships
-          # its headers as an iio/ tree. build_win.ps1 wants libiio1.lib next to
-          # the include root, so flatten the binaries but keep iio/ intact.
-          7z x "${{ matrix.artifact-name }}.zip" -o"libiio_pkg" -y
-          Get-ChildItem -Recurse libiio_pkg -Include *.dll,*.lib |
+          $pkg = "$env:RUNNER_TEMP\libiio_pkg"
+          7z x "${{ matrix.artifact-name }}.zip" -o"$pkg" -y
+          # Deps sit at the package root, libiio1.dll/.lib under <build-type>/, and a
+          # duplicate set under Debug/ on non-release builds. Take everything but Debug.
+          Get-ChildItem -Recurse $pkg -Include *.dll,*.lib |
+            Where-Object { $_.Directory.Name -ne 'Debug' } |
             ForEach-Object { Copy-Item $_.FullName . -Force }
-          $inc = Get-ChildItem -Recurse -Directory libiio_pkg -Filter iio | Select-Object -First 1
+          $inc = Get-ChildItem -Recurse -Directory $pkg -Filter iio | Select-Object -First 1
           Copy-Item $inc.FullName .\iio -Recurse -Force
       - name: List libiio artifact contents (verify deps present)
         shell: pwsh
@@ -116,6 +115,7 @@ jobs:
     needs: msvc
     if: github.event_name != 'pull_request'
     runs-on: windows-2022
+    timeout-minutes: 20
     env:
       BUILD_ARTIFACTSTAGINGDIRECTORY: ${{ github.workspace }}\staging
 

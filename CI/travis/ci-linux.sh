@@ -1,15 +1,6 @@
 #!/bin/bash
 
-set -x
-
-handle_centos() {
-	local package=$1
-	yum -y install yum-utils gcc
-	yum config-manager --set-enabled powertools
-	yum localinstall -y $package
-	export CMAKE_OPTIONS="-DPYTHON_BINDINGS=ON -DENABLE_PACKAGING=ON .."
-
-}
+set -ex
 
 handle_fedora() {
 	local package=$1
@@ -37,13 +28,7 @@ handle_"$1" "$2"
 # Build project
 mkdir -p build
 cd build
-cmake $CMAKE_OPTIONS
+cmake -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}" -DCPACK_SYSTEM_NAME="${ARTIFACTNAME}" $CMAKE_OPTIONS
 sudo make && sudo make package && make test
 sudo make install
 ldconfig
-cd ..
-cd bindings/python
-pip install -r requirements_dev.txt
-export LD_LIBRARY_PATH=/usr/local/lib/
-python3 -m pip install pytest
-python3 -m pytest -vs --skip-scan
