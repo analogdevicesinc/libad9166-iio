@@ -71,7 +71,7 @@ jobs:
             package-type: rpm
     defaults:
       run:
-        shell: /bin/bash {0}
+        shell: bash
     container:
       image: ${{ matrix.image }}
       env:
@@ -130,16 +130,10 @@ jobs:
       - name: Build
         run: |
           set -e
-          source $GITHUB_WORKSPACE/.venv/bin/activate
-          chmod +x ./CI/travis/${{ matrix.build-script }}
-          LIBIIO_PKG=$(ls build/libiio-*.${{ matrix.package-type }} 2>/dev/null | head -1)
-          if [ -z "$LIBIIO_PKG" ]; then
-            echo "Error: No libiio package found in build/"
-            ls -la build/
-            exit 1
-          fi
-          echo "Using libiio package: $LIBIIO_PKG"
-          ./CI/travis/${{ matrix.build-script }} "${{ matrix.os-type }}" "$LIBIIO_PKG"
+          source "$GITHUB_WORKSPACE/.venv/bin/activate"
+          libiio_pkg=$(ls build/libiio-*.${{ matrix.package-type }})
+          echo "Building against ${libiio_pkg}"
+          bash "./CI/travis/${{ matrix.build-script }}" "${{ matrix.os-type }}" "${libiio_pkg}"
       - name: Upload build artifacts
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -147,53 +141,4 @@ jobs:
           name: ${{ matrix.artifact-name }}
           path: |
             build/*9166*.${{ matrix.package-type }}
-          if-no-files-found: error
-  linux-upstream:
-    name: upstream-ubuntu-amd64
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    env:
-      APP_NAME: libad9166
-      ARTIFACT_NAME: libad9166-libiio-upstream
-    defaults:
-      run:
-        working-directory: ${{ env.APP_NAME }}
-    steps:
-      - name: Checkout code repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 1
-          path: ${{ env.APP_NAME }}
-
-      - name: Identify version
-        id: set_version
-        run: |
-          # Extract version from CMakeLists.txt project() line
-          cmake_version=$(grep -oP 'project\s*\([^)]*VERSION\s+\K[0-9]+\.[0-9]+(\.[0-9]+)?' CMakeLists.txt)
-          if [[ -z "$cmake_version" ]]; then
-            echo "Failed to extract version from CMakeLists.txt, using default"
-            cmake_version="0.0.1+${{ github.sha }}"
-          fi
-          echo "Version to use: $cmake_version"
-          echo "version=$cmake_version" >> "$GITHUB_OUTPUT"
-
-      - name: Create .deb package
-        run: |
-          .github/scripts/create_debian.sh ${{ steps.set_version.outputs.version }}
-
-      - name: Copy debian artifacts
-        run: |
-          mkdir -p artifacts
-          cp ../*.deb ../*.dsc ../*.debian.tar.xz ../*.orig.tar.gz artifacts/
-          ls -la artifacts/
-
-      - name: Upload debian artifacts to github
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: ${{ env.ARTIFACT_NAME }}-ubuntu
-          path: |
-            ${{ env.APP_NAME }}/artifacts/*.deb
-            ${{ env.APP_NAME }}/artifacts/*.dsc
-            ${{ env.APP_NAME }}/artifacts/*.debian.tar.xz
-            ${{ env.APP_NAME }}/artifacts/*.orig.tar.gz
           if-no-files-found: error

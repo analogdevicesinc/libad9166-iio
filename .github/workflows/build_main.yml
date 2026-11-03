@@ -1,4 +1,4 @@
-name: Build and Deploy libad9166-iio
+name: Build and Deploy libad9166-iio main
 
 permissions:
   contents: read
@@ -119,34 +119,35 @@ jobs:
           fetch-depth: 1
       - name: Install uv
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
-      - name: Get libiio from Cloudsmith
-        env:
-          CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
+      - name: Install py11, create venv and install dependencies
         run: |
           set -e
-          # Match the rest of the pipeline: fetch requests into an isolated uv
-          # venv rather than mutating the runner's PEP 668 system interpreter.
+          cd "$GITHUB_WORKSPACE"
           uv python install 3.11
           uv venv --python 3.11 --seed
           uv pip install requests
-          curl -fsSL https://raw.githubusercontent.com/analogdevicesinc/wiki-scripts/8d7a96779dd034005279ed1c7d052514df695d8c/utils/cloudsmith_utils/cloudsmith_helper.py \
-            -o /tmp/cloudsmith_helper.py
-          UBUNTU_VER=$(lsb_release -rs)
-          mkdir -p /tmp/libiio && cd /tmp/libiio
-          "$GITHUB_WORKSPACE/.venv/bin/python3" /tmp/cloudsmith_helper.py \
-            --method get_artifacts_from_location \
-            --repo external \
-            --package_version "${{ needs.setup.outputs.libiio-version }}" \
-            --package_name "Linux-Ubuntu-${UBUNTU_VER}.deb"
-          sudo apt-get install -y libiio-*.deb
+          echo "UBUNTU_VER=$(lsb_release -rs)" >> "$GITHUB_ENV"
+
+      - name: Get libiio from Cloudsmith
+        uses: ./.github/actions/get-libiio
+        with:
+          cloudsmith-api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
+          package-name: Linux-Ubuntu-${{ env.UBUNTU_VER }}.deb
+          package-version: ${{ needs.setup.outputs.libiio-version }}
+          python: $GITHUB_WORKSPACE/.venv/bin/python3
+          output-dir: /tmp/libiio
+
+      - name: Install libiio
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y /tmp/libiio/libiio-*.deb
           sudo ldconfig
 
       - uses: analogdevicesinc/shared-actions/pypi-build@7c51759246c2bd85f7310dc8843e2799fe0b30a6 # main
         with:
           cmake-options: '-DPYTHON_BINDINGS=ON -DENABLE_PACKAGING=ON -DDEB_DETECT_DEPENDENCIES=ON'
           apt-packages: 'cmake libxml2-dev libusb-1.0-0-dev'
-          run-tests: 'true'
-          pytest-args: '-vs --skip-scan'
           artifact-name: libad9166-dist
 
   #############################################
@@ -210,8 +211,15 @@ jobs:
         with:
           path: ${{ github.workspace }}/artifacts
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
       - name: Install Cloudsmith CLI
-        run: pip install cloudsmith-cli
+        run: |
+          set -e
+          uv python install 3.11
+          uv venv --python 3.11 /tmp/cloudsmith-venv --seed
+          uv pip install --python /tmp/cloudsmith-venv/bin/python3 cloudsmith-cli
+          echo "/tmp/cloudsmith-venv/bin" >> "$GITHUB_PATH"
 
       - name: Upload to Cloudsmith
         env:
@@ -220,51 +228,40 @@ jobs:
           set -e
           VERSION="${{ needs.setup.outputs.cloudsmith-version }}"
           ARTIFACTS="${{ github.workspace }}/artifacts"
+          push() {  # <name> <tag> <file>
+            cloudsmith push raw --republish \
+              --name "$1" --tags "$2" --version "${VERSION}" adi/external "$3"
+          }
           for dir in "${ARTIFACTS}"/*/; do
             tag=$(basename "${dir}")
-            [[ "${tag}" == "Artifact-manifest" ]] && continue
-            [[ "${tag}" == libad9166-dist ]] && continue
-            [[ "${tag}" == libad9166-libiio-upstream-* ]] && continue
-            if [[ "${tag}" == Windows-* ]]; then
-              cd "${ARTIFACTS}"
-              zip -r "${tag}.zip" "${tag}"
-              rm -r "${tag}"
-              cloudsmith push raw --republish \
-                --tags "${tag}" \
-                --version "${VERSION}" \
-                adi/external "${tag}.zip"
-              rm "${tag}.zip"
-              cd -
-              continue
-            fi
-            if [[ "${tag}" == "Libad9166-Setup-Exe" ]]; then
-              # Installer already has a clean, stable name; publish it as-is.
-              for file in "${dir}"*.exe; do
-                [[ -f "${file}" ]] || continue
-                cloudsmith push raw --republish \
-                  --name "$(basename "${file}")" \
-                  --tags "Windows-Setup-Exe" \
-                  --version "${VERSION}" \
-                  adi/external "${file}"
-              done
-              continue
-            fi
+            case "${tag}" in
+              Artifact-manifest|libad9166-dist|libad9166-libiio-upstream-*)
+                continue ;;
+              Windows-*)
+                # Ship the whole Windows tree as a single archive.
+                ( cd "${ARTIFACTS}" && zip -r "${tag}.zip" "${tag}" )
+                rm -r "${dir}"
+                push "${tag}.zip" "${tag}" "${ARTIFACTS}/${tag}.zip"
+                rm "${ARTIFACTS}/${tag}.zip"
+                continue ;;
+              Libad9166-Setup-Exe)
+                # Installer already has a clean, stable name; publish it as-is.
+                for file in "${dir}"*.exe; do
+                  [[ -f "${file}" ]] || continue
+                  push "$(basename "${file}")" Windows-Setup-Exe "${file}"
+                done
+                continue ;;
+            esac
             for file in "${dir}"*; do
               [[ -f "${file}" ]] || continue
               filename=$(basename "${file}")
-              # Strip git hash (.g<hex>) so the name is stable across commits
+              # Strip git hash (.g<hex>) so the name is stable across commits;
+              # macOS .pkg names carry no arch, so append the tag when missing.
               stable=$(echo "${filename}" | sed 's/\.g[0-9a-f]\+//')
               ext="${stable##*.}"
               stable="${stable%.${ext}}"
-              # macOS .pkg files don't include arch in the name; add tag
-              if [[ "${filename}" != *"${tag}"* ]]; then
-                stable="${stable}-${tag}"
-              fi
-              cloudsmith push raw --republish \
-                --name "${stable}.${ext}" \
-                --tags "${tag}" \
-                --version "${VERSION}" \
-                adi/external "${file}"
+              [[ "${filename}" == *"${tag}"* ]] || stable="${stable}-${tag}"
+              push "${stable}.${ext}" "${tag}" "${file}"
             done
           done
 

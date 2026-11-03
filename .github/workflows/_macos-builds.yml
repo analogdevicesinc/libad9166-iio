@@ -27,6 +27,8 @@ jobs:
             artifact-name: macOS-26-arm64
           - os: macos-26-large
             artifact-name: macOS-26-x64
+          - os: xcode-27
+            artifact-name: macOS-27-arm64
     name: ${{ matrix.artifact-name }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
@@ -53,17 +55,13 @@ jobs:
       - name: Install dependencies
         run: |
           set -e
-          TAR=$(find ${{ github.workspace }}/build -name "*.tar" | head -1)
-          if [ -n "$TAR" ]; then
-            tar xf "$TAR" -C ${{ github.workspace }}/build
-          fi
-          PKG=$(find ${{ github.workspace }}/build -name "*.pkg" | head -1)
-          if [ -z "$PKG" ]; then
-            echo "Error: no libiio .pkg found in ${{ github.workspace }}/build"
-            ls -la ${{ github.workspace }}/build
-            exit 1
-          fi
-          PACKAGE_TO_INSTALL="$PKG" ./CI/travis/before_install_darwin
+
+          # The libiio macOS artifact may arrive as a tarball wrapping the .pkg.
+          ( shopt -s nullglob; cd build; for tar in *.tar; do tar xf "$tar"; done )
+
+          # Keep this a plain assignment: a VAR=$(...) prefix would swallow ls's failure.
+          pkg=$(ls build/*.pkg)
+          PACKAGE_TO_INSTALL="$pkg" ./CI/travis/before_install_darwin
       - name: Build
         run: ./CI/travis/make_darwin
       - name: Collect PKG artifacts
