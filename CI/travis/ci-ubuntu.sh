@@ -2,7 +2,7 @@
 
 set -ex
 uname -a
-DEBIAN_FRONTEND=noninteractive apt install -y make libaio-dev \
+DEBIAN_FRONTEND=noninteractive apt install -y make graphviz libaio-dev \
 	libavahi-client-dev libavahi-common-dev libusb-1.0-0-dev \
 	rpm tar bzip2 gzip libserialport-dev python3-pip
 dpkg -i /ci/build/*.deb
@@ -15,7 +15,11 @@ pip_install() {
 }
 
 pip_install setuptools wheel
-pip_install pylibiio
+# build from source (matches ci-linux.sh / v0) so the binding links the system libiio
+pip_install pylibiio --no-binary :all:
+# WITH_DOC defaults ON when Doxygen is present; the python bindings doc build
+# needs sphinx + the rtd theme (cmake FATAL_ERRORs otherwise). Matches v0/Azure.
+pip_install sphinx sphinx-rtd-theme
 
 echo "$PWD"
 
