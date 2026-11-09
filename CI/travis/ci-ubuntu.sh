@@ -15,8 +15,11 @@ pip_install() {
 }
 
 pip_install setuptools wheel
-# build from source (matches ci-linux.sh / v0) so the binding links the system libiio
-pip_install pylibiio --no-binary :all:
+# build the libiio binding from source (v0/Azure behavior). pylibiio's setup.py
+# hardcodes the x86_64 multiarch path for its libiio check; DESTDIR=/usr/lib (scoped
+# to this command, not exported, so it can't affect `make install` below) redirects
+# that check to the real multiarch dir, so it also finds libiio on arm/ppc64le/s390x.
+DESTDIR=/usr/lib pip_install pylibiio --no-binary :all:
 # WITH_DOC defaults ON when Doxygen is present; the python bindings doc build
 # needs sphinx + the rtd theme (cmake FATAL_ERRORs otherwise). Matches v0/Azure.
 pip_install sphinx sphinx-rtd-theme
