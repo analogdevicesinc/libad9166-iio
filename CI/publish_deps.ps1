@@ -4,8 +4,8 @@ $ErrorView = "NormalView"
 
 $src_dir=$pwd
 
-# Visual Studio 2022 only; redist path matches the libiio CI.
-cd 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Redist\MSVC\14.29.30133\x64\Microsoft.VC142.CRT'
+# VS2022 redist; the version and VC14x.CRT folders shift with the runner toolset, so glob for the newest.
+cd (Get-ChildItem 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Redist\MSVC\*\x64\Microsoft.VC*.CRT' -Directory | Sort-Object FullName -Descending | Select-Object -First 1).FullName
 cp .\msvcp140.dll $env:BUILD_ARTIFACTSTAGINGDIRECTORY
 cp .\vcruntime140.dll $env:BUILD_ARTIFACTSTAGINGDIRECTORY
 

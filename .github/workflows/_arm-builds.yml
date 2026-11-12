@@ -78,7 +78,7 @@ jobs:
           set -e
           docker run \
             ${{ matrix.platform-flag }} \
-            --rm -t --privileged \
+            --rm -t \
             -e ARTIFACTNAME=${{ matrix.artifact-name }} \
             -e CMAKE_BUILD_TYPE=${{ inputs.build-type }} \
             -v "${{ github.workspace }}":"/ci" \
@@ -217,7 +217,7 @@ jobs:
           set -e
           docker run \
             --platform "linux/${{ matrix.arch }}" \
-            --rm -t --privileged \
+            --rm -t \
             -e ARTIFACTNAME=${{ matrix.artifact-name }} \
             -e CMAKE_BUILD_TYPE=${{ inputs.build-type }} \
             -v "${{ github.workspace }}":"/ci" \

@@ -10,9 +10,8 @@ dpkg -i /ci/build/*.deb
 # run ldconfig) is discoverable at runtime
 ldconfig
 
-pip_install() {
-	python3 -m pip install "$@" --break-system-packages 2>/dev/null || python3 -m pip install "$@"
-}
+# newer pip (PEP 668) needs --break-system-packages, older pip rejects it; try with, fall back without
+pip_install() { python3 -m pip install "$@" --break-system-packages || python3 -m pip install "$@"; }
 
 pip_install setuptools wheel
 # build the libiio binding from source (v0/Azure behavior). pylibiio's setup.py
