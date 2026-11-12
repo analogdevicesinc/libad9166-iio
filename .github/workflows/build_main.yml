@@ -119,13 +119,12 @@ jobs:
           fetch-depth: 1
       - name: Install uv
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
-      - name: Install py11, create venv and install dependencies
+      - name: Install helper requirements
         run: |
           set -e
-          cd "$GITHUB_WORKSPACE"
           uv python install 3.11
-          uv venv --python 3.11 --seed
-          uv pip install requests
+          uv venv --python 3.11 /tmp/cloudsmith-venv --seed
+          uv pip install --python /tmp/cloudsmith-venv/bin/python3 requests
           echo "UBUNTU_VER=$(lsb_release -rs)" >> "$GITHUB_ENV"
 
       - name: Get libiio from Cloudsmith
@@ -134,7 +133,7 @@ jobs:
           cloudsmith-api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
           package-name: Linux-Ubuntu-${{ env.UBUNTU_VER }}.deb
           package-version: ${{ needs.setup.outputs.libiio-version }}
-          python: $GITHUB_WORKSPACE/.venv/bin/python3
+          python: /tmp/cloudsmith-venv/bin/python3
           output-dir: /tmp/libiio
 
       - name: Install libiio
@@ -148,61 +147,15 @@ jobs:
         with:
           cmake-options: '-DPYTHON_BINDINGS=ON -DENABLE_PACKAGING=ON -DDEB_DETECT_DEPENDENCIES=ON'
           apt-packages: 'cmake libxml2-dev libusb-1.0-0-dev'
+          run-tests: 'false'
           artifact-name: libad9166-dist
-
-  #############################################
-  # Check Artifacts
-  #############################################
-  check-artifacts:
-    if: |
-      always() &&
-      !cancelled() &&
-      !contains(needs.*.result, 'failure') &&
-      (needs.setup.outputs.is-main == 'true' || needs.setup.outputs.is-release == 'true')
-    needs: [setup, linux, arm, macos, windows, build-pypi]
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          path: artifacts/
-
-      - name: Check artifacts
-        run: |
-          set -e
-          MISSING=0
-          for dir in artifacts/*/; do
-            name=$(basename "$dir")
-            count=$(find "$dir" -type f | wc -l)
-            if [ "$count" -eq 0 ]; then
-              echo "EMPTY: $name"
-              MISSING=$((MISSING + 1))
-            else
-              echo "OK: $name ($count file(s))"
-            fi
-          done
-          echo ""
-          find artifacts -type f | sort | tee artifact_manifest.txt
-          echo ""
-          echo "Total: $(wc -l < artifact_manifest.txt) files"
-          if [ "$MISSING" -gt 0 ]; then
-            echo "ERROR: $MISSING artifact(s) empty"
-            exit 1
-          fi
-
-      - name: Upload manifest
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: Artifact-manifest
-          path: artifact_manifest.txt
 
   #############################################
   # Push to Cloudsmith
   #############################################
   push-cloudsmith:
     if: needs.setup.outputs.is-main == 'true' || needs.setup.outputs.is-release == 'true'
-    needs: [setup, check-artifacts]
+    needs: [setup, linux, arm, macos, windows, build-pypi]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -228,40 +181,52 @@ jobs:
           set -e
           VERSION="${{ needs.setup.outputs.cloudsmith-version }}"
           ARTIFACTS="${{ github.workspace }}/artifacts"
-          push() {  # <name> <tag> <file>
-            cloudsmith push raw --republish \
-              --name "$1" --tags "$2" --version "${VERSION}" adi/external "$3"
-          }
           for dir in "${ARTIFACTS}"/*/; do
             tag=$(basename "${dir}")
-            case "${tag}" in
-              Artifact-manifest|libad9166-dist|libad9166-libiio-upstream-*)
-                continue ;;
-              Windows-*)
-                # Ship the whole Windows tree as a single archive.
-                ( cd "${ARTIFACTS}" && zip -r "${tag}.zip" "${tag}" )
-                rm -r "${dir}"
-                push "${tag}.zip" "${tag}" "${ARTIFACTS}/${tag}.zip"
-                rm "${ARTIFACTS}/${tag}.zip"
-                continue ;;
-              Libad9166-Setup-Exe)
-                # Installer already has a clean, stable name; publish it as-is.
-                for file in "${dir}"*.exe; do
-                  [[ -f "${file}" ]] || continue
-                  push "$(basename "${file}")" Windows-Setup-Exe "${file}"
-                done
-                continue ;;
-            esac
+            [[ "${tag}" == "Artifact-manifest" ]] && continue
+            [[ "${tag}" == libad9166-dist ]] && continue
+            [[ "${tag}" == libad9166-libiio-upstream-* ]] && continue
+            if [[ "${tag}" == Windows-* ]]; then
+              # Ship the whole Windows tree as a single archive.
+              cd "${ARTIFACTS}"
+              zip -r "${tag}.zip" "${tag}"
+              rm -r "${tag}"
+              cloudsmith push raw --republish \
+                --tags "${tag}" \
+                --version "${VERSION}" \
+                adi/external "${tag}.zip"
+              rm "${tag}.zip"
+              cd -
+              continue
+            fi
+            if [[ "${tag}" == "Libad9166-Setup-Exe" ]]; then
+              # Installer already has a clean, stable name; publish it as-is.
+              for file in "${dir}"*.exe; do
+                [[ -f "${file}" ]] || continue
+                cloudsmith push raw --republish \
+                  --name "$(basename "${file}")" \
+                  --tags Windows-Setup-Exe \
+                  --version "${VERSION}" \
+                  adi/external "${file}"
+              done
+              continue
+            fi
             for file in "${dir}"*; do
               [[ -f "${file}" ]] || continue
               filename=$(basename "${file}")
-              # Strip git hash (.g<hex>) so the name is stable across commits;
-              # macOS .pkg names carry no arch, so append the tag when missing.
+              # Strip git hash (.g<hex>) so the name is stable across commits
               stable=$(echo "${filename}" | sed 's/\.g[0-9a-f]\+//')
               ext="${stable##*.}"
               stable="${stable%.${ext}}"
-              [[ "${filename}" == *"${tag}"* ]] || stable="${stable}-${tag}"
-              push "${stable}.${ext}" "${tag}" "${file}"
+              # macOS .pkg files don't include arch in the name; add tag
+              if [[ "${filename}" != *"${tag}"* ]]; then
+                stable="${stable}-${tag}"
+              fi
+              cloudsmith push raw --republish \
+                --name "${stable}.${ext}" \
+                --tags "${tag}" \
+                --version "${VERSION}" \
+                adi/external "${file}"
             done
           done
 
@@ -270,7 +235,7 @@ jobs:
   #############################################
   push-github-release:
     if: needs.setup.outputs.is-release == 'true'
-    needs: [setup, check-artifacts]
+    needs: [setup, linux, arm, macos, windows, build-pypi]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

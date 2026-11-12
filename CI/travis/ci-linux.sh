@@ -28,7 +28,7 @@ handle_"$1" "$2"
 # Build project
 mkdir -p build
 cd build
-cmake -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}" -DCPACK_SYSTEM_NAME="${ARTIFACTNAME}" $CMAKE_OPTIONS
+cmake -DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}" -DWITH_DOC=OFF -DCPACK_SYSTEM_NAME="${ARTIFACTNAME}" $CMAKE_OPTIONS
 sudo make && sudo make package && make test
 sudo make install
 ldconfig
