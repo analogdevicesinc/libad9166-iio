@@ -131,10 +131,7 @@ jobs:
         run: |
           set -e
           source "$GITHUB_WORKSPACE/.venv/bin/activate"
-          # libiio-main~latest can carry more than one version (e.g. 1.0.0 and
-          # 1.1.0); dnf rejects installing two versions at once, so pick only
-          # the newest package.
-          libiio_pkg=$(ls -1 build/libiio-*.${{ matrix.package-type }} | sort -V | tail -n1)
+          libiio_pkg=$(ls build/libiio-*.${{ matrix.package-type }})
           echo "Building against ${libiio_pkg}"
           bash "./CI/travis/${{ matrix.build-script }}" "${{ matrix.os-type }}" "${libiio_pkg}"
       - name: Upload build artifacts
