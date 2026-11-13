@@ -1,4 +1,7 @@
 #!/bin/bash
+# Copyright (c) 2022-2026 Analog Devices, Inc.
+#
+# SPDX-License-Identifier: LGPL-2.1-or-later
 
 set -ex
 uname -a
