@@ -45,4 +45,3 @@ runs:
           --repo "${{ inputs.repo }}" \
           --package_version "${{ inputs.package-version }}" \
           --package_name "${{ inputs.package-name }}"
-        ls -1 *"${{ inputs.package-name }}" | sort -rV | tail -n +2 | while read -r f; do rm -f "$f"; done
