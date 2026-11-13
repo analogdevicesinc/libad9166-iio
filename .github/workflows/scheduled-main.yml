@@ -1,0 +1,22 @@
+# Copyright (c) 2026 Analog Devices, Inc.
+#
+# SPDX-License-Identifier: LGPL-2.1-or-later
+
+name: Scheduled main Build
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'   # Monthly, 1st at 00:00 UTC
+
+permissions:
+  actions: write
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Dispatch main build
+        run: gh workflow run build_main.yml --ref main -R ${{ github.repository }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
