@@ -153,11 +153,11 @@ jobs:
   # Push to Cloudsmith
   #############################################
   push-cloudsmith:
-    if: |
-      always() &&
-      !cancelled() &&
-      !contains(needs.*.result, 'failure') &&
-      (needs.setup.outputs.is-v0 == 'true' || needs.setup.outputs.is-release == 'true')
+    # if: |
+    #   always() &&
+    #   !cancelled() &&
+    #   !contains(needs.*.result, 'failure') &&
+    #   (needs.setup.outputs.is-v0 == 'true' || needs.setup.outputs.is-release == 'true')
     needs: [setup, linux, arm, macos, windows, build-pypi]
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -196,7 +196,7 @@ jobs:
               cloudsmith push raw --republish \
                 --tags "${tag}" \
                 --version "${VERSION}" \
-                adi/external "${tag}.zip"
+                adi/test-alin-repo "${tag}.zip"
               rm "${tag}.zip"
               cd -
               continue
@@ -209,7 +209,7 @@ jobs:
                   --name "$(basename "${file}")" \
                   --tags "Windows-Setup-Exe" \
                   --version "${VERSION}" \
-                  adi/external "${file}"
+                  adi/test-alin-repo "${file}"
               done
               continue
             fi
@@ -228,7 +228,7 @@ jobs:
                 --name "${stable}.${ext}" \
                 --tags "${tag}" \
                 --version "${VERSION}" \
-                adi/external "${file}"
+                adi/test-alin-repo "${file}"
             done
           done
 
