@@ -1,23 +1,30 @@
 #!/bin/bash
+# Copyright (c) 2022-2026 Analog Devices, Inc.
+#
+# SPDX-License-Identifier: LGPL-2.1-or-later
 
-set -x
+set -ex
 uname -a
-DEBIAN_FRONTEND=noninteractive apt install -y make graphviz libaio-dev \
+DEBIAN_FRONTEND=noninteractive apt install -y make libaio-dev \
 	libavahi-client-dev libavahi-common-dev libusb-1.0-0-dev \
-	rpm tar bzip2 gzip libserialport-dev python3-pip
+	rpm tar bzip2 gzip libserialport-dev
 dpkg -i /ci/build/*.deb
-python3 -m pip install pylibiio --no-binary :all:
-python3 -m pip install sphinx
-python3 -m pip install sphinx-rtd-theme
+# refresh the loader cache so the just-installed libiio (its CPack .deb doesn't
+# run ldconfig) is discoverable at runtime
+ldconfig
+
+pip install setuptools wheel pylibiio
 
 echo "$PWD"
 
 mkdir -p build
 cd build
-cmake -DPYTHON_BINDINGS=ON -DENABLE_PACKAGING=ON -DDEB_DETECT_DEPENDENCIES=ON ..
+cmake -DPYTHON_BINDINGS=ON -DENABLE_PACKAGING=ON -DDEB_DETECT_DEPENDENCIES=ON -DWITH_DOC=OFF \
+	-DCMAKE_BUILD_TYPE="${CMAKE_BUILD_TYPE:-Release}" -DCPACK_SYSTEM_NAME="${ARTIFACTNAME}" ..
 make && make package && make test
 make install
-# ldconfig
-# cd ../bindings/python
-# pip3 install -r requirements_dev.txt
-# python3 -m pytest -vs --skip-scan
+ldconfig
+export LD_LIBRARY_PATH=/usr/local/lib:${LD_LIBRARY_PATH:-}
+cd ../bindings/python
+pip install -r requirements_dev.txt
+python3 -m pytest -vs --skip-scan

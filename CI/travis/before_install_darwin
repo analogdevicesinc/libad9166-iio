@@ -1,8 +1,11 @@
 #!/bin/sh -e
+# Copyright (c) 2026 Analog Devices, Inc.
+#
+# SPDX-License-Identifier: LGPL-2.1-or-later
 
 . CI/travis/lib.sh
 
-brew_install_if_not_exists cmake doxygen libusb libxml2 libserialport
+brew_install_if_not_exists cmake libusb libxml2 libserialport
 
 if [ -n "$PACKAGE_TO_INSTALL" ] ; then
 	for file in $PACKAGE_TO_INSTALL ; do

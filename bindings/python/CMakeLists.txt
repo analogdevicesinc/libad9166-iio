@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.87)
+cmake_minimum_required(VERSION 3.5)
 project(libad9166-py NONE)
 
 if(${CMAKE_VERSION} VERSION_LESS "3.12.0")
@@ -26,7 +26,10 @@ if (Python3_FOUND)
 	add_custom_target(libad9166-py-py ALL DEPENDS ${SETUP_PY} COMMAND ${Python3_EXECUTABLE} ${SETUP_PY} --quiet build)
 
 	if(NOT SKIP_INSTALL_ALL)
-		install(CODE "execute_process(WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} COMMAND ${Python3_EXECUTABLE} ${SETUP_PY} install --root=\$ENV{DESTDIR}/ --prefix=${CMAKE_INSTALL_PREFIX})")
+		# Use --target to explicitly set install location (Python 3.10+ changed --prefix behavior)
+		# For Debian packages: installs to $DESTDIR/usr/lib/python3/dist-packages
+		# For manual installs: installs to /usr/local/lib/python3/dist-packages
+		install(CODE "execute_process(WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} COMMAND ${Python3_EXECUTABLE} -m pip install --target=\$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/python3/dist-packages --no-deps --no-build-isolation .)")
 	endif()
 else()
 	message(FATAL_ERROR "Python search failed : Can not build Python bindings")
