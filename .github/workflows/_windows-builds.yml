@@ -9,6 +9,9 @@ on:
       libiio-version:
         required: true
         type: string
+    secrets:
+      CLOUDSMITH_API_KEY:
+        required: true
 
 jobs:
   msvc:
@@ -28,41 +31,43 @@ jobs:
       COMPILER: ${{ matrix.compiler }}
       ARCH: ${{ matrix.arch }}
       USE_CSHARP: 'ON'
+      CMAKE_BUILD_TYPE: ${{ inputs.build-type }}
       BUILD_ARTIFACTSTAGINGDIRECTORY: ${{ github.workspace }}\staging
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
       - name: Setup Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: '3.11'
-      - run: pip install requests sphinx
+      - run: pip install requests
       - name: Get libiio from Cloudsmith
-        env:
-          CLOUDSMITH_API_KEY: ${{ secrets.CLOUDSMITH_API_KEY }}
+        uses: ./.github/actions/get-libiio
+        with:
+          cloudsmith-api-key: ${{ secrets.CLOUDSMITH_API_KEY }}
+          package-name: ${{ matrix.artifact-name }}.zip
+          package-version: ${{ inputs.libiio-version }}
+          # setup-python does not provide a python3 shim on Windows
+          python: python
+      - name: Stage libiio for the build
         shell: pwsh
+        working-directory: build
         run: |
           $ErrorActionPreference = "Stop"
-          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/analogdevicesinc/wiki-scripts/refs/heads/main/utils/cloudsmith_utils/cloudsmith_helper.py" `
-            -OutFile "$env:TEMP\cloudsmith_helper.py"
-          if (!(Test-Path build)) { mkdir build }
-          cd build
-          python "$env:TEMP\cloudsmith_helper.py" `
-            --method get_artifacts_from_location `
-            --repo external `
-            --package_version "${{inputs.libiio-version}}" `
-            --package_name "${{ matrix.artifact-name }}.zip"
-          # libiio v1 nests the binaries under a build-type directory and ships
-          # its headers as an iio/ tree. build_win.ps1 wants libiio1.lib next to
-          # the include root, so flatten the binaries but keep iio/ intact.
-          7z x "${{ matrix.artifact-name }}.zip" -o"libiio_pkg" -y
-          Get-ChildItem -Recurse libiio_pkg -Include *.dll,*.lib |
+          $pkg = "$env:RUNNER_TEMP\libiio_pkg"
+          7z x "${{ matrix.artifact-name }}.zip" -o"$pkg" -y
+          # Deps sit at the package root, libiio1.dll/.lib under <build-type>/, and a
+          # duplicate set under Debug/ on non-release builds. Take everything but Debug.
+          Get-ChildItem -Recurse $pkg -Include *.dll,*.lib |
+            Where-Object { $_.Directory.Name -ne 'Debug' } |
             ForEach-Object { Copy-Item $_.FullName . -Force }
-          $inc = Get-ChildItem -Recurse -Directory libiio_pkg -Filter iio | Select-Object -First 1
+          $inc = Get-ChildItem -Recurse -Directory $pkg -Filter iio | Select-Object -First 1
           Copy-Item $inc.FullName .\iio -Recurse -Force
-          Get-ChildItem .
+      - name: List libiio artifact contents (verify deps present)
+        shell: pwsh
+        run: Get-ChildItem build\*.dll
       - name: Create staging directory
         shell: pwsh
         run: New-Item -ItemType Directory -Force -Path "$env:BUILD_ARTIFACTSTAGINGDIRECTORY"
@@ -74,7 +79,7 @@ jobs:
       - name: Copy libraries
         shell: pwsh
         run: |
-          Copy-Item -Path "build\Release\*" -Destination "$env:BUILD_ARTIFACTSTAGINGDIRECTORY" -Force
+          Copy-Item -Path "build\$env:CMAKE_BUILD_TYPE\*" -Destination "$env:BUILD_ARTIFACTSTAGINGDIRECTORY" -Force
 
       - name: Copy ad9166.h header
         shell: pwsh
@@ -84,7 +89,9 @@ jobs:
       - name: Copy .exe files
         shell: pwsh
         run: |
-          Copy-Item -Path "build\*.exe" -Destination "$env:BUILD_ARTIFACTSTAGINGDIRECTORY" -ErrorAction SilentlyContinue
+          Get-ChildItem -Path build -Recurse -Filter *.exe |
+            Where-Object { $_.Directory.Name -eq $env:CMAKE_BUILD_TYPE } |
+            Copy-Item -Destination "$env:BUILD_ARTIFACTSTAGINGDIRECTORY"
 
       - name: Copy libiio1.dll
         shell: pwsh
@@ -97,27 +104,29 @@ jobs:
 
       - name: Upload build artifacts
         if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.artifact-name }}
           path: ${{ github.workspace }}\staging
+          if-no-files-found: error
 
   generate-setup-exe:
     name: Generate Setup Exe
     needs: msvc
     if: github.event_name != 'pull_request'
     runs-on: windows-2022
+    timeout-minutes: 20
     env:
       BUILD_ARTIFACTSTAGINGDIRECTORY: ${{ github.workspace }}\staging
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
 
       - name: Download Windows build artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: Windows-VS-2022-x64
           path: ${{ github.workspace }}\staging\Windows-VS-2022-x64
@@ -131,7 +140,8 @@ jobs:
         run: .\CI\generate_exe.ps1
 
       - name: Upload setup exe
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: Libad9166-Setup-Exe
           path: ${{ github.workspace }}\staging
+          if-no-files-found: error
